@@ -15,7 +15,7 @@
 
 ## 运行
 
-建议使用 Node.js 24。
+需要 Node.js 22 或更高版本（`package.json` 中的 `engines` 已声明）。依赖锁定文件只使用官方 npm 源，可直接 `npm ci`。
 
 ```sh
 npm ci
@@ -46,6 +46,9 @@ npm run preview
 | --- | --- |
 | `XAI_API_KEY` | 可选AI解释；未配置时使用本地规则复盘 |
 | `XAI_TRAINING_MODEL` | 可选训练解释模型 |
+| `XAI_TRAINING_HOURLY_LIMIT` | 训练解释每个服务实例每小时调用上限（默认10，范围1–100） |
+| `XAI_ANALYZE_MODEL` | 可选账本分析模型；未设置时沿用 `XAI_TRAINING_MODEL`，再回退到 `grok-4.5` |
+| `XAI_ANALYZE_HOURLY_LIMIT` | 账本分析每个服务实例每小时调用上限（默认10，范围1–100），同时最多2个并发 |
 | `DATABASE_URL` | 可选外部数据库；本地训练不依赖它 |
 | `GROK_AUTH_CLIENT_ID`、`GROK_AUTH_CLIENT_SECRET` | 启用登录时使用的部署OAuth凭据 |
 | `GROK_PREVIEW_CLIENT_SECRET` | 使用Grok共享预览登录时，由服务端环境提供 |

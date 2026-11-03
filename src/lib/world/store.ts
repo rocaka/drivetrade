@@ -315,6 +315,7 @@ export const useWorld = create<WorldStore>((set, get) => ({
     if (config.mode === "free") {
       config.generationProfile ??= "mixed-v1";
       config.assessmentVersion ??= "process-v2-trading";
+      config.marketTape ??= "tape-v1";
     }
     if (config.mode === "exam") {
       // Existing frozen assessments keep their original generation profile.

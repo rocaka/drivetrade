@@ -120,10 +120,13 @@ type TradingState = {
   addTrade: (input: TradeInput) => void;
   updateTrade: (id: string, input: TradeInput) => void;
   removeTrade: (id: string) => void;
+  restoreTrade: (trade: Trade) => void;
   addRule: (input: Omit<Rule, "id" | "isActive">) => void;
   updateRule: (id: string, patch: Partial<Omit<Rule, "id">>) => void;
   toggleRule: (id: string) => void;
   removeRule: (id: string) => void;
+  restoreRule: (rule: Rule, index: number) => void;
+  moveRule: (id: string, offset: -1 | 1) => void;
   replaceAll: (data: { trades: Trade[]; rules: Rule[]; principal?: number }) => void;
   importFomo: (incoming: Trade[], principal: number | null) => { added: number; skipped: number };
 };
@@ -139,8 +142,15 @@ export function isDisciplineTrade(trade: Trade) {
   return trade.source !== "fomo";
 }
 
+/** Newest first: by trade date, then by when it was recorded. Imports and edits can leave the array out of order. */
+export function newestFirst(trades: Trade[]) {
+  return [...trades].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
+  );
+}
+
 export function executionStats(trades: Trade[]) {
-  const scoped = trades.filter(isDisciplineTrade);
+  const scoped = newestFirst(trades.filter(isDisciplineTrade));
   const total = scoped.length;
   const followed = scoped.filter((trade) => trade.followedPlan).length;
   const rate = total === 0 ? 0 : Math.round((followed / total) * 100);
@@ -308,6 +318,12 @@ export const useTrading = create<TradingState>()(
         set((state) => ({
           trades: state.trades.filter((trade) => trade.id !== id),
         })),
+      restoreTrade: (trade) =>
+        set((state) =>
+          state.trades.some((item) => item.id === trade.id)
+            ? state
+            : { trades: [trade, ...state.trades] },
+        ),
       addRule: (input) =>
         set((state) => ({
           rules: [...state.rules, { ...input, id: crypto.randomUUID(), isActive: true }],
@@ -326,6 +342,22 @@ export const useTrading = create<TradingState>()(
         set((state) => ({
           rules: state.rules.filter((rule) => rule.id !== id),
         })),
+      restoreRule: (rule, index) =>
+        set((state) => {
+          if (state.rules.some((item) => item.id === rule.id)) return state;
+          const rules = [...state.rules];
+          rules.splice(Math.max(0, Math.min(index, rules.length)), 0, rule);
+          return { rules };
+        }),
+      moveRule: (id, offset) =>
+        set((state) => {
+          const from = state.rules.findIndex((rule) => rule.id === id);
+          const to = from + offset;
+          if (from < 0 || to < 0 || to >= state.rules.length) return state;
+          const rules = [...state.rules];
+          [rules[from], rules[to]] = [rules[to], rules[from]];
+          return { rules };
+        }),
       replaceAll: (data) =>
         set({
           trades: data.trades,

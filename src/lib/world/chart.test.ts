@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   aggregateQuoteCandles,
+  intervalVolumes,
   chartTimeTicks,
   formatChartTime,
   positionChartOverlay,
@@ -228,4 +229,57 @@ test("line paths keep real numeric times and break at missing reference quotes",
     ]),
     [[{ t: 0, price: 2 }]],
   );
+});
+
+test("intervalVolumes turns running totals into per-interval amounts", () => {
+  const samples = [
+    { t: 0, volume: 100 },
+    { t: 15, volume: 130 },
+    { t: 45, volume: 160 },
+    { t: 60, volume: 160 },
+    { t: 75, volume: 210 },
+    { t: 135, volume: 220 },
+  ];
+  assert.deepEqual(intervalVolumes(samples, 60), [
+    { time: 0, volume: 60 },
+    { time: 60, volume: 50 },
+    { time: 120, volume: 10 },
+  ]);
+  assert.deepEqual(intervalVolumes(samples, 60, { through: 60 }), [
+    { time: 0, volume: 60 },
+    { time: 60, volume: 0 },
+  ]);
+  // A lower total (trimmed history) never produces a negative bar.
+  assert.deepEqual(intervalVolumes([{ t: 0, volume: 50 }, { t: 15, volume: 10 }], 60), [
+    { time: 0, volume: 0 },
+  ]);
+  assert.throws(() => intervalVolumes(samples, 0), RangeError);
+});
+
+test("recorded window extremes become wicks and the open follows the previous close", () => {
+  const candles = aggregateQuoteCandles(
+    [
+      { t: 0, price: 10, open: 10, high: 10, low: 10 },
+      { t: 15, price: 12, open: 10, high: 14, low: 9 },
+      { t: 30, price: 11, open: 12, high: 12, low: 8 },
+    ],
+    15,
+    { scale: 2 },
+  );
+  assert.deepEqual(
+    candles.map((c) => [c.open, c.high, c.low, c.close]),
+    [
+      [20, 20, 20, 20],
+      [20, 28, 18, 24],
+      [24, 24, 16, 22],
+    ],
+  );
+  const minute = aggregateQuoteCandles(
+    [
+      { t: 0, price: 10 },
+      { t: 15, price: 12, open: 10, high: 14, low: 9 },
+    ],
+    60,
+  );
+  assert.deepEqual([minute[0].open, minute[0].high, minute[0].low, minute[0].close], [10, 14, 9, 12]);
 });

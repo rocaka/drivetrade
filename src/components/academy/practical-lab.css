@@ -413,3 +413,32 @@
 .lab-trading .lab-ticket-balances {
   margin-block: 18px;
 }
+
+.lab-saved-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0;
+  color: var(--color-ok);
+  font-size: 0.8rem;
+}
+
+.lab-track-heading {
+  margin-top: 24px;
+}
+
+/* Risk of the typed amount at the stop: the trade's 1R. */
+.lab-risk-line {
+  margin-top: -4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-ok) 10%, transparent);
+  color: var(--color-fg);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lab-risk-line.is-off {
+  background: color-mix(in oklab, var(--color-bad) 12%, transparent);
+}

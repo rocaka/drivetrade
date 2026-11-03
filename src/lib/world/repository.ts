@@ -55,6 +55,7 @@ const config = z
     marketVariant: marketVariant.optional(),
     generationProfile: z.literal("mixed-v1").optional(),
     assessmentVersion: assessmentVersion.optional(),
+    marketTape: z.literal("tape-v1").optional(),
     spawnPerMinute: z.number().finite().min(0.1).max(12),
     protection: z.boolean(),
     duration: z
@@ -102,7 +103,20 @@ const tokenSchema = z
     taxMutable: z.boolean(),
     sellTaxBps: z.number().int().min(0).max(10000),
     frozen: z.boolean(),
-    history: z.array(z.object({ t: time, price, volume: nonnegative }).strict()).max(5000),
+    history: z
+      .array(
+        z
+          .object({
+            t: time,
+            price,
+            volume: nonnegative,
+            open: price.optional(),
+            high: price.optional(),
+            low: price.optional(),
+          })
+          .strict(),
+      )
+      .max(5000),
     initialPrice: price,
     peakPrice: price,
     trades: count,

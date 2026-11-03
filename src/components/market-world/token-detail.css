@@ -1,0 +1,582 @@
+/* Token page: one column on phones, chart + pinned trade panel on wide screens. */
+
+.td {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "top"
+    "head"
+    "chart"
+    "position"
+    "trade"
+    "info";
+  gap: 12px;
+  padding-bottom: 72px;
+}
+
+.td-topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.td-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 20px;
+  background: var(--color-surface);
+}
+
+/* Header */
+.td-head {
+  grid-area: head;
+  display: grid;
+  gap: 14px;
+}
+
+.td-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.td-identity-text {
+  min-width: 0;
+}
+
+.mw-app .td-identity h2 {
+  overflow: hidden;
+  font-size: 18px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.td-identity h2 span {
+  margin-left: 4px;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.td-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.td-age {
+  color: var(--color-faint);
+  font-size: 12px;
+}
+
+.td-quote-label,
+.td-caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.td-quote-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.td-quote-row strong {
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.td-change {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.td-change.is-up {
+  background: color-mix(in oklab, var(--color-ok) 16%, transparent);
+  color: var(--color-ok);
+}
+
+.td-change.is-down {
+  background: color-mix(in oklab, var(--color-bad) 16%, transparent);
+  color: var(--color-bad);
+}
+
+.td-unit-price {
+  margin-top: 2px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.td-unit-price :is(span, strong) {
+  color: var(--color-fg);
+}
+
+.td-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.td-stats div {
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.td-stats div + div {
+  border-left: 1px solid var(--color-line);
+}
+
+.td-stats dt {
+  color: var(--color-faint);
+  font-size: 11px;
+}
+
+.td-stats dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Chart */
+.td-chart {
+  grid-area: chart;
+  padding: 12px 12px 8px;
+}
+
+/* Position */
+.td-position {
+  grid-area: position;
+  display: grid;
+  gap: 12px;
+}
+
+.td-position-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.td-position-head strong {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.td-position-head strong small {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.td-position-qty {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.td-position-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.td-position-grid dt {
+  color: var(--color-faint);
+  font-size: 11px;
+}
+
+.td-position-grid dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.td-position-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.td-position-actions button {
+  min-height: 40px;
+  border: 1px solid color-mix(in oklab, var(--color-bad) 45%, var(--color-line));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-bad);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.td-position-actions button:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--color-bad) 12%, transparent);
+}
+
+.td .is-up {
+  color: var(--color-ok);
+}
+
+.td .is-down {
+  color: var(--color-bad);
+}
+
+/* Trade ticket */
+.td-trade {
+  grid-area: trade;
+  display: grid;
+  gap: 14px;
+  scroll-margin-top: 12px;
+}
+
+.td-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--color-bg);
+}
+
+.td-side button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 15px;
+  font-weight: 800;
+  transition:
+    background 180ms ease,
+    color 180ms ease;
+}
+
+.td-side button.is-buy[aria-selected="true"] {
+  background: var(--color-ok);
+  color: var(--color-bg);
+}
+
+.td-side button.is-sell[aria-selected="true"] {
+  background: var(--color-bad);
+  color: var(--color-bg);
+}
+
+.td-balance {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.td-balance strong {
+  color: var(--color-fg);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.td-balance small {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.td-amount {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 64px;
+  padding: 0 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-bg);
+  transition: border-color 160ms ease;
+}
+
+.td-amount:focus-within {
+  border-color: var(--color-primary);
+}
+
+[data-side="sell"] .td-amount:focus-within {
+  border-color: var(--color-bad);
+}
+
+[data-side="buy"] .td-amount:focus-within {
+  border-color: var(--color-ok);
+}
+
+.td-amount input {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg);
+  font-size: 30px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.mw-app .td-amount input:focus-visible {
+  outline: none;
+}
+
+.td-amount input::placeholder {
+  color: var(--color-faint);
+}
+
+.td-amount-affix {
+  color: var(--color-muted);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.td-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.td-presets button {
+  min-height: 38px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-fg);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.td-presets button:hover:not(:disabled) {
+  border-color: var(--color-muted);
+}
+
+.td-presets button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 18%, transparent);
+}
+
+.td-presets button:disabled {
+  opacity: 0.35;
+}
+
+.td-presets-small {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.td-summary {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--color-bg);
+  font-size: 12px;
+}
+
+.td-summary div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.td-summary dt {
+  color: var(--color-muted);
+}
+
+.td-summary dd {
+  margin: 0;
+  color: var(--color-fg);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.td-summary .td-summary-main {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.td-hint {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.mw-app .td-submit {
+  min-height: 52px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.mw-app .td-submit.is-buy:not(:disabled) {
+  background: var(--color-ok);
+  color: var(--color-bg);
+}
+
+.mw-app .td-submit.is-sell:not(:disabled) {
+  background: var(--color-bad);
+  color: var(--color-bg);
+}
+
+.td-observe {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  margin-top: -6px;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.td-observe:hover:not(:disabled) {
+  color: var(--color-fg);
+}
+
+.td-observe:disabled {
+  opacity: 0.4;
+}
+
+.td-settings-row {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.td-info {
+  grid-area: info;
+  min-width: 0;
+}
+
+/* Bottom action dock (phones only, while the ticket is off-screen). */
+.td-dock {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: 1fr 1fr 52px;
+  gap: 8px;
+  padding: 10px 16px max(env(safe-area-inset-bottom, 0px), 12px);
+  border-top: 1px solid var(--color-line);
+  background: color-mix(in oklab, var(--color-bg) 90%, transparent);
+  backdrop-filter: blur(12px);
+  transition:
+    transform 220ms ease,
+    opacity 220ms ease;
+}
+
+.td-dock.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(100%);
+}
+
+.td-dock button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.td-dock .is-buy {
+  background: var(--color-ok);
+  color: var(--color-bg);
+}
+
+.td-dock .is-sell {
+  background: var(--color-bad);
+  color: var(--color-bg);
+}
+
+.td-dock .td-dock-observe {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-fg);
+}
+
+.td-dock button:disabled {
+  opacity: 0.35;
+}
+
+@media (max-width: 380px) {
+  .td-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .td-stats div:nth-child(3) {
+    border-left: 0;
+  }
+  .td-stats div:nth-child(n + 3) {
+    border-top: 1px solid var(--color-line);
+  }
+  .td-quote-row strong {
+    font-size: 30px;
+  }
+}
+
+@media (min-width: 960px) {
+  .mw-token-open .mw-main-column {
+    max-width: 68rem;
+  }
+  .td {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    grid-template-areas:
+      "top top"
+      "head trade"
+      "chart trade"
+      "position trade"
+      "info trade";
+    grid-template-rows: auto auto auto auto 1fr;
+    column-gap: 20px;
+    padding-bottom: 24px;
+  }
+  .td-trade {
+    position: sticky;
+    top: 12px;
+    align-self: start;
+  }
+  .td-dock {
+    display: none;
+  }
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { analyzeBook, type Analysis } from "@/lib/trading/analyze";
+import { analyzeBook } from "@/lib/trading/analyze";
+import type { Analysis } from "@/lib/trading/analysis";
 import { executionStats, formatSigned, moneyStats, useTrading } from "@/lib/trading/store";
 import { Button, Card } from "./ui";
 
@@ -69,7 +70,8 @@ export function AiPanel() {
     const lines = trades.slice(0, 120).map((trade) => {
       const pnl = trade.pnl === null ? "未平" : formatSigned(trade.pnl);
       const stake = trade.stake === null ? "投入?" : String(trade.stake);
-      return `${trade.date} ${trade.symbol} 投入${stake} 盈亏${pnl}${trade.source === "fomo" ? " 导入" : ""}`;
+      const line = `${trade.date} ${trade.symbol} 投入${stake} 盈亏${pnl}${trade.source === "fomo" ? " 导入" : ""}`;
+      return line.slice(0, 180);
     });
     const summary = [
       `本金 ${money.principal}`,
@@ -95,7 +97,11 @@ export function AiPanel() {
         analysis: result.analysis,
         at: new Date().toISOString(),
       };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+      } catch {
+        // Storage can be full or blocked; the fresh analysis is still shown.
+      }
     } catch {
       setError("分析没跑成，过一会儿再试");
     } finally {

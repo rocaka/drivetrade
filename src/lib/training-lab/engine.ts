@@ -5,9 +5,10 @@ import {
   createTradingLab,
   tradingExtraActionSchema,
   tradingLabResult,
+  ADVANCED_LAB_CHALLENGES as advancedLabs,
   TRADING_LAB_CHALLENGES,
 } from "./trading.ts";
-import type { LabAction, LabRun, LabState } from "./types.ts";
+import type { LabAction, LabChallenge, LabRun, LabState } from "./types.ts";
 export type {
   LabAction,
   LabChallenge,
@@ -18,10 +19,16 @@ export type {
   LabTradePlan,
 } from "./types.ts";
 export { labPrice, labSellQuote, labEquity, labConservation } from "./legacy.ts";
-export { tradingBuyQuote, planRiskReward } from "./trading.ts";
+export { tradingBuyQuote, planRiskReward, ADVANCED_RISK_CENTS } from "./trading.ts";
 export const LEGACY_LAB_CHALLENGES = legacy.LAB_CHALLENGES;
 export const LAB_CHALLENGES = TRADING_LAB_CHALLENGES;
-export const ALL_LAB_CHALLENGES = [...LAB_CHALLENGES, ...LEGACY_LAB_CHALLENGES];
+/** Optional advanced exercises; they never change the 12-exercise requirement. */
+export const ADVANCED_LAB_CHALLENGES = advancedLabs;
+export const ALL_LAB_CHALLENGES = [
+  ...LAB_CHALLENGES,
+  ...ADVANCED_LAB_CHALLENGES,
+  ...LEGACY_LAB_CHALLENGES,
+];
 export const getLabChallenge = (id: string) => ALL_LAB_CHALLENGES.find((c) => c.id === id);
 export function createLab(id: string, seed: string): LabState {
   return id.startsWith("trade-practice-") ? createTradingLab(id, seed) : legacy.createLab(id, seed);
@@ -44,7 +51,9 @@ export const labRunSchema = z.union([
   z
     .object({
       version: z.literal("lab-v2-trading"),
-      challengeId: z.string().refine((id) => LAB_CHALLENGES.some((c) => c.id === id)),
+      challengeId: z
+        .string()
+        .refine((id) => [...LAB_CHALLENGES, ...ADVANCED_LAB_CHALLENGES].some((c) => c.id === id)),
       seed: z.string().min(1).max(120),
       actions: z.array(tradingActionSchema).min(1).max(200),
       result: legacy.labRunSchema.shape.result,
@@ -95,9 +104,12 @@ export function validateLabRun(value: unknown): value is LabRun {
     return false;
   }
 }
-export function evaluateLabs(runs: readonly LabRun[]) {
+export function evaluateLabs(
+  runs: readonly LabRun[],
+  challenges: readonly LabChallenge[] = LAB_CHALLENGES,
+) {
   const valid = runs.filter((r) => r.version === "lab-v2-trading" && validateLabRun(r));
-  const checks = LAB_CHALLENGES.map((c) => {
+  const checks = challenges.map((c) => {
     const attempts = valid.filter((r) => r.challengeId === c.id);
     return {
       id: c.id,

@@ -230,36 +230,6 @@ const chartViews = [
 
 type ChartView = (typeof chartViews)[number][0];
 
-export function EquitySpark({ data }: { data: CurvePoint[] }) {
-  if (data.length < 2) return null;
-  const last = data[data.length - 1]?.equity ?? 0;
-  const first = data[0]?.equity ?? 0;
-  const up = last >= first;
-  return (
-    <div className="pointer-events-none mt-3 h-16 w-full" aria-hidden>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="spark-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={up ? "var(--color-ok)" : "var(--color-bad)"} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={up ? "var(--color-ok)" : "var(--color-bad)"} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <Area
-            type="monotone"
-            dataKey="equity"
-            stroke={up ? "var(--color-ok)" : "var(--color-bad)"}
-            strokeWidth={2}
-            fill="url(#spark-fill)"
-            animationDuration={800}
-            animationEasing="ease-out"
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 function PnlBars({ data }: { data: CurvePoint[] }) {
   return (
     <div className="h-40 w-full min-w-0">

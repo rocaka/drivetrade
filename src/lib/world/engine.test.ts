@@ -13,7 +13,7 @@ import {
   publicObservations,
   tokenPrice,
 } from "./engine.ts";
-import type { ChainId, World, WorldConfig } from "./types.ts";
+import type { World, WorldConfig } from "./types.ts";
 
 const config: WorldConfig = {
   seed: "engine-fixture-2026",
@@ -847,4 +847,19 @@ test("mixed partial entries, exit, migration, bridge and authorized rug conserve
   assertTokenSupplies(w);
   assert.ok(w.report!.fees > 0);
   assert.ok(w.report!.trades >= 3);
+});
+
+test("tape-v1 adds continuous two-way flow and wick extremes without touching untaped worlds", () => {
+  const plain = stepWorld(createWorld(mixedConfig), 600);
+  const taped = stepWorld(createWorld({ ...mixedConfig, marketTape: "tape-v1" }), 600);
+  assert.deepEqual(taped, stepWorld(createWorld({ ...mixedConfig, marketTape: "tape-v1" }), 600));
+  assert.ok(plain.tokens.every((t) => t.flowAt === undefined));
+  const trades = (w: typeof plain) => w.tokens.reduce((sum, t) => sum + t.trades, 0);
+  assert.ok(trades(taped) > trades(plain) * 1.5);
+  for (const t of taped.tokens)
+    for (const point of t.history.filter((p) => p.open !== undefined)) {
+      assert.ok(point.low! <= Math.min(point.open!, point.price));
+      assert.ok(point.high! >= Math.max(point.open!, point.price));
+    }
+  assert.ok(taped.tokens.some((t) => t.history.some((p) => p.high! > Math.max(p.open!, p.price))));
 });

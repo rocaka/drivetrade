@@ -6,13 +6,14 @@ import { ChecklistScreen } from "./checklist";
 import { HomeScreen } from "./home";
 import { JournalScreen } from "./journal";
 import { RulesScreen } from "./rules";
-import { StatsScreen } from "./stats";
 import {
   appLocationFor,
   appLocationUrl,
   readAppLocation,
   type TrainingDestination,
 } from "@/lib/training/navigation";
+
+const StatsScreen = lazy(() => import("./stats").then((m) => ({ default: m.StatsScreen })));
 
 const TrainingShell = lazy(() =>
   import("@/components/training-shell").then((m) => ({ default: m.TrainingShell })),
@@ -156,10 +157,20 @@ export function DisciplineApp() {
           >
             {tab === "home" ? (
               <>
-                <p className="text-sm font-medium text-primary-fg/80">目标 80 · 先执行再谈钱</p>
+                <p className="text-sm font-medium text-primary-fg/80">
+                  {stats.total === 0
+                    ? "执行率 · 记下第一笔后开始计算"
+                    : `执行率 · 目标 80 · 连续按计划 ${stats.streak} 笔`}
+                </p>
                 <p className="mt-0.5 text-[4.25rem] font-black leading-none tabular-nums tracking-tight">
-                  {shown}
-                  <span className="text-2xl">%</span>
+                  {stats.total === 0 ? (
+                    "—"
+                  ) : (
+                    <>
+                      {shown}
+                      <span className="text-2xl">%</span>
+                    </>
+                  )}
                 </p>
               </>
             ) : (
@@ -204,7 +215,9 @@ export function DisciplineApp() {
             ) : null}
             {tab === "stats" ? (
               <div className="screen-in">
-                <StatsScreen onEdit={openEdit} />
+                <Suspense fallback={<p className="py-12 text-center text-sm text-muted">正在载入统计…</p>}>
+                  <StatsScreen onEdit={openEdit} />
+                </Suspense>
               </div>
             ) : null}
           </div>

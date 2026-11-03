@@ -1,6 +1,13 @@
 import { TrainingSelect } from "@/components/training-select";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Check, Copy, Star } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Clock3,
+  Copy,
+  ShieldCheck,
+  Star,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useWorld } from "@/lib/world/store";
 import {
@@ -17,7 +24,6 @@ import {
   ActionButton,
   BackButton,
   ChainBadge,
-  Metric,
   Price,
   ageLabel,
   chainSpec,
@@ -27,7 +33,8 @@ import {
 } from "./shared";
 import { MarketNews } from "./market-news";
 import { TokenAvatar } from "./token-avatar";
-import { CandlestickChart } from "./candlestick-chart";
+import { PriceChart } from "./price-chart";
+import "./token-detail.css";
 import { EasterEggBadge, EasterEggInfo } from "./easter-egg";
 import { AnimatedValue, TrainingDisclosure, useTrainingActive } from "@/components/training-ui";
 import { TradePlanFields, buildTradePlan, freshPlan } from "./trade-plan";
@@ -173,11 +180,19 @@ export function TokenDetail({
   const supply = units(token.supply);
   const currentPrice = price * fx;
   const chartHistory = useMemo(() => {
-    const current = { t: world.now, price, volume: 0 };
-    return token.history.at(-1)?.t === world.now
-      ? [...token.history.slice(0, -1), current]
-      : [...token.history, current];
-  }, [token.history, world.now, price]);
+    const past = token.history.at(-1)?.t === world.now ? token.history.slice(0, -1) : token.history;
+    const open = past.at(-1)?.price ?? price;
+    // The forming window: previous close, live extremes and the running volume total.
+    const current = {
+      t: world.now,
+      price,
+      volume: token.volume,
+      open,
+      high: Math.max(open, price, token.bar?.high ?? price),
+      low: Math.min(open, price, token.bar?.low ?? price),
+    };
+    return [...past, current];
+  }, [token.history, token.bar, token.volume, world.now, price]);
   const marketCap = currentPrice * supply;
   const nativeBalance = units(world.wallet[token.chain].native);
   const gas = quote?.gas ?? quoteTrade(world, token.id, "buy", "1").gas;
@@ -343,51 +358,118 @@ export function TokenDetail({
       toast.success("自动提交规则已更新");
   }
 
+  const tradeRef = useRef<HTMLElement>(null);
+  const amountRef = useRef<HTMLInputElement>(null);
+  const [tradeInView, setTradeInView] = useState(true);
+  useEffect(() => {
+    const element = tradeRef.current;
+    if (!element || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setTradeInView(entry.isIntersecting), {
+      threshold: 0.15,
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  function openTicket(next: Side, percent?: number) {
+    if (preparing) return;
+    if (next !== side) switchSide(next);
+    if (percent !== undefined && position) {
+      setAmount(inputFromAtoms((BigInt(position.quantity) * BigInt(percent)) / 100n));
+      setSellPercent(percent);
+      setLocalError("");
+    }
+    tradeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (percent === undefined) window.setTimeout(() => amountRef.current?.focus({ preventScroll: true }), 350);
+  }
+  const positionPnl = exitValue - cost;
+  const positionPct = cost > 0 ? (positionPnl / cost) * 100 : null;
+  const feeUsd = quote ? (units(quote.fee) + units(quote.gas)) * fx : 0;
+  const receiveText = quote
+    ? side === "buy"
+      ? `${compact(units(quote.amountOut))} ${token.symbol}`
+      : currencyCompact(Math.max(0, (units(quote.amountOut) - units(quote.gas)) * fx))
+    : "—";
+  const disabledReason = readOnly
+    ? "另一标签正在运行"
+    : !canTrade
+      ? "当前世界已停止新增交易"
+      : isPending
+        ? "等待上一笔成交"
+        : null;
+
   return (
-    <div className="mw-detail">
-      <div className="mw-detail-back">
+    <div className="mw-detail td" data-side={side}>
+      <div className="td-topbar">
         <BackButton onClick={onBack} />
         <button
           type="button"
           className={`mw-icon-button ${watched ? "mw-starred" : ""}`}
           aria-label={watched ? "取消关注项目" : "关注项目"}
+          aria-pressed={watched}
           onClick={onWatch}
         >
           <Star size={20} fill={watched ? "currentColor" : "none"} />
         </button>
       </div>
-      <section className="mw-price-section">
-        <div className="mw-inline mw-wrap">
-          <ChainBadge id={token.chain} />
-          {token.easterEgg ? (
-            <EasterEggBadge token={token} />
-          ) : (
-            <span className="mw-tag">{platformName(token.platformId)}</span>
-          )}
-          <span className="mw-muted">
-            {statusLabel(token)} · {ageLabel(world.now, token.bornAt)}
-          </span>
+
+      <header className="td-head">
+        <div className="td-identity">
+          <TokenAvatar token={token} size={48} />
+          <div className="td-identity-text">
+            <h2>
+              {token.name} <span>{token.symbol}</span>
+            </h2>
+            <div className="td-badges">
+              <ChainBadge id={token.chain} />
+              {token.easterEgg ? (
+                <EasterEggBadge token={token} />
+              ) : (
+                <span className="mw-tag">{platformName(token.platformId)}</span>
+              )}
+              <span className="td-age">
+                {statusLabel(token)} · {ageLabel(world.now, token.bornAt)}
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="mw-price-title">
-          <TokenAvatar token={token} size={40} />
-          <div className="mw-marketcap-figure">
-            <span>参考市值</span>
+        <div className="td-quote">
+          <span className="td-quote-label">参考市值</span>
+          <div className="td-quote-row">
             <strong>
               <AnimatedValue value={marketCap} format={currencyCompact} />
             </strong>
+            <span className={`td-change ${change >= 0 ? "is-up" : "is-down"}`}>
+              {change >= 0 ? "+" : ""}
+              {change.toFixed(1)}%
+            </span>
           </div>
-          <span className={change >= 0 ? "mw-ok" : "mw-bad"}>
-            {change >= 0 ? "+" : ""}
-            {change.toFixed(1)}%
-          </span>
+          <p className="td-unit-price">
+            单价 <Price value={currentPrice} />
+          </p>
         </div>
-        <div className="mw-detail-unit-price">
-          <span>单价</span>
-          <Price value={currentPrice} />
-          <span className="mw-caption">{token.symbol}</span>
-        </div>
+        <dl className="td-stats">
+          <div>
+            <dt>池深度</dt>
+            <dd>{currencyCompact(units(token.pool.quote) * fx)}</dd>
+          </div>
+          <div>
+            <dt>持币地址</dt>
+            <dd>{token.holders}</dd>
+          </div>
+          <div>
+            <dt>成交笔数</dt>
+            <dd>{token.trades}</dd>
+          </div>
+          <div>
+            <dt>成交额</dt>
+            <dd>{currencyCompact(token.volume)}</dd>
+          </div>
+        </dl>
         <EasterEggInfo token={token} />
-        <CandlestickChart
+      </header>
+
+      <section className="td-card td-chart" aria-label="行情图">
+        <PriceChart
           history={chartHistory}
           now={world.now}
           scale={fx * (chartMode === "marketCap" ? supply : 1)}
@@ -395,71 +477,126 @@ export function TokenDetail({
           onModeChange={setChartMode}
           positionOverlay={chartPosition}
         />
-        <div className="mw-price-facts">
-          <span>
-            池深度 <strong>{currencyCompact(units(token.pool.quote) * fx)}</strong>
-          </span>
-          <span>
-            持币 <strong>{token.holders} 地址</strong>
-          </span>
-          <span>
-            成交 <strong>{token.trades} 笔</strong>
-          </span>
-        </div>
       </section>
-      <section className="mw-panel mw-trade-panel">
-        <div className="mw-trade-tabs" aria-label="交易方向">
+
+      {position && quantity > 0 && (
+        <section className="td-card td-position" aria-label="我的持仓">
+          <div className="td-position-head">
+            <div>
+              <span className="td-caption">我的持仓 · 净退出盈亏</span>
+              <strong className={positionPnl >= 0 ? "is-up" : "is-down"}>
+                {positionPnl >= 0 ? "+" : "−"}${money(Math.abs(positionPnl))}
+                {positionPct !== null ? (
+                  <small>
+                    {positionPct >= 0 ? "+" : ""}
+                    {positionPct.toFixed(2)}%
+                  </small>
+                ) : null}
+              </strong>
+            </div>
+            <span className="td-position-qty">
+              {compact(quantity)} {token.symbol}
+            </span>
+          </div>
+          <dl className="td-position-grid">
+            <div>
+              <dt>余仓成本</dt>
+              <dd>${money(cost)}</dd>
+            </div>
+            <div>
+              <dt>预计净退出</dt>
+              <dd>${money(exitValue)}</dd>
+            </div>
+            <div>
+              <dt>撤退参考 · 市值</dt>
+              <dd>
+                {position.stopPrice ? currencyCompact(position.stopPrice * fx * supply) : "未设置"}
+              </dd>
+            </div>
+            <div>
+              <dt>目标参考 · 市值</dt>
+              <dd>
+                {position.targetPrice ? currencyCompact(position.targetPrice * fx * supply) : "未设置"}
+              </dd>
+            </div>
+          </dl>
+          {!canExit && (
+            <div className="mw-notice mw-notice-danger">
+              <AlertTriangle size={18} />
+              <span>{exitReason ?? "当前无法退出"} · 净退出估值 $0.00</span>
+            </div>
+          )}
+          <div className="td-position-actions">
+            <button type="button" disabled={!canTrade} onClick={() => openTicket("sell", 50)}>
+              卖出一半
+            </button>
+            <button type="button" disabled={!canTrade} onClick={() => openTicket("sell", 100)}>
+              全部卖出
+            </button>
+          </div>
+          {world.config.assessmentVersion === "process-v2-trading" && (
+            <p className="td-caption">
+              <ShieldCheck size={13} /> 自动保护为系统教学预设，可在交易面板中调整
+            </p>
+          )}
+        </section>
+      )}
+
+      <section ref={tradeRef} className="td-card td-trade" aria-label="交易">
+        <div className="td-side" role="tablist" aria-label="交易方向">
           {(["buy", "sell"] as const).map((value) => (
             <button
               type="button"
+              role="tab"
               key={value}
-              className={side === value ? "is-active" : ""}
+              aria-selected={side === value}
+              className={`is-${value}`}
               onClick={() => switchSide(value)}
             >
-              {value === "buy" ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}{" "}
               {value === "buy" ? "买入" : "卖出"}
             </button>
           ))}
         </div>
-        <div className="mw-trade-wallet">
-          <div>
-            <span>账户余额</span>
-            <strong>${money(cashUsd)}</strong>
-            <small>自动准备交易余额</small>
-          </div>
-          <div>
-            <span>当前持仓</span>
-            <strong>
-              {compact(quantity)} {token.symbol}
-            </strong>
-            <small>{quantity > 0 ? `预计净退出 ${currencyCompact(exitValue)}` : "尚未买入"}</small>
-          </div>
+
+        <div className="td-balance">
+          {side === "buy" ? (
+            <>
+              <span>可用资金</span>
+              <strong>${money(cashUsd)}</strong>
+            </>
+          ) : (
+            <>
+              <span>持有</span>
+              <strong>
+                {compact(quantity)} {token.symbol}
+                {quantity > 0 ? <small> ≈ {currencyCompact(exitValue)}</small> : null}
+              </strong>
+            </>
+          )}
         </div>
-        <label className="mw-label mw-amount-field">
-          {side === "buy" ? "买入金额 · USD" : `卖出数量 · ${token.symbol}`}
+
+        <label className="td-amount">
+          <span className="sr-only">
+            {side === "buy" ? "买入金额（美元）" : `卖出数量（${token.symbol}）`}
+          </span>
+          {side === "buy" ? <span className="td-amount-affix">$</span> : null}
           <input
+            ref={amountRef}
             value={amount}
             onChange={(event) => {
               setAmount(event.target.value);
               setSellPercent(null);
             }}
             inputMode="decimal"
-            placeholder="0.00"
+            placeholder="0"
             aria-label={side === "buy" ? "买入金额" : "卖出数量"}
             disabled={!canTrade || preparing}
           />
+          {side === "sell" ? <span className="td-amount-affix">{token.symbol}</span> : null}
         </label>
-        <p className="mw-trade-equivalent">
-          {side === "buy"
-            ? amountAtom
-              ? `预计投入 ${currencyCompact(amountUsd)}`
-              : "选择金额，或自己输入"
-            : amountAtom && quantity > 0
-              ? `约占持仓 ${((units(amountAtom) / quantity) * 100).toFixed(1)}%`
-              : "按持仓比例选择，也可输入数量"}
-        </p>
+
         {side === "buy" ? (
-          <div className="mw-buy-presets">
+          <div className="td-presets">
             {BUY_PRESETS.map((preset) => {
               const presetAtom = dollarAmount(preset, fx);
               const insufficient = Number(preset) > cashUsd;
@@ -467,7 +604,6 @@ export function TokenDetail({
                 <button
                   type="button"
                   key={preset}
-                  className={amountAtom === presetAtom ? "is-active" : ""}
                   aria-pressed={amountAtom === presetAtom}
                   data-testid={`quick-buy-${preset}`}
                   aria-label={`买入金额 $${preset}`}
@@ -478,18 +614,17 @@ export function TokenDetail({
                     setLocalError("");
                   }}
                 >
-                  <strong>${preset}</strong>
+                  ${preset}
                 </button>
               );
             })}
           </div>
         ) : (
-          <div className="mw-sell-presets">
+          <div className="td-presets">
             {[25, 50, 75, 100].map((percent) => (
               <button
                 type="button"
                 key={percent}
-                className={sellPercent === percent ? "is-active" : ""}
                 aria-pressed={sellPercent === percent}
                 data-testid={`quick-sell-${percent}`}
                 disabled={
@@ -505,11 +640,12 @@ export function TokenDetail({
                   setLocalError("");
                 }}
               >
-                {percent}%
+                {percent === 100 ? "全部" : `${percent}%`}
               </button>
             ))}
           </div>
         )}
+
         {legacyPlan && (
           <label className="mw-label">
             交易依据
@@ -534,30 +670,33 @@ export function TokenDetail({
             amountUsd={amountAtom ? amountUsd + units(gas) * fx : 0}
           />
         )}
-        {quote && (
-          <div className="mw-simple-quote">
-            <div>
-              <span>{side === "buy" ? "预计买到" : "预计到手"}</span>
-              <strong>
-                {side === "buy"
-                  ? `${compact(units(quote.amountOut))} ${token.symbol}`
-                  : currencyCompact(Math.max(0, (units(quote.amountOut) - units(quote.gas)) * fx))}
-              </strong>
-            </div>
-            <div>
-              <span>预计费用</span>
-              <span>{currencyCompact((units(quote.fee) + units(quote.gas)) * fx)}</span>
-            </div>
-            {!quote.ok && <p className="mw-inline-error">{quote.error}</p>}
-            {quote.ok &&
-              side === "buy" &&
-              (units(quote.fee) + units(quote.gas)) * fx > amountUsd * 0.1 && (
-                <p className="mw-muted">这笔费用占比较高，可以先观察或调整金额。</p>
-              )}
+
+        <dl className="td-summary">
+          <div>
+            <dt>{side === "buy" ? "预计买到" : "预计到手"}</dt>
+            <dd className="td-summary-main">{receiveText}</dd>
           </div>
+          <div>
+            <dt>费用（含链费）</dt>
+            <dd>{quote ? currencyCompact(feeUsd) : "—"}</dd>
+          </div>
+          <div>
+            <dt>价格影响</dt>
+            <dd className={quote && quote.impactPct >= 5 ? "is-down" : undefined}>
+              {quote ? `${quote.impactPct < 0.01 ? "<0.01" : quote.impactPct.toFixed(2)}%` : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt>滑点容忍</dt>
+            <dd>{slippage}%</dd>
+          </div>
+        </dl>
+        {quote && !quote.ok && <p className="mw-inline-error">{quote.error}</p>}
+        {quote?.ok && side === "buy" && feeUsd > amountUsd * 0.1 && (
+          <p className="td-hint">这笔费用占比较高，可以先观察或调整金额。</p>
         )}
         {preparing && (
-          <p className="mw-muted" role="status">
+          <p className="td-hint" role="status">
             {tradeStatus}
           </p>
         )}
@@ -566,7 +705,9 @@ export function TokenDetail({
             {localError}
           </p>
         )}
+
         <ActionButton
+          className={`td-submit is-${side}`}
           busy={busy || preparing}
           disabled={
             !canTrade ||
@@ -579,27 +720,42 @@ export function TokenDetail({
           }
           onClick={submit}
         >
-          {readOnly
-            ? "另一标签正在运行"
-            : !canTrade
-              ? "当前世界已停止新增交易"
-              : isPending
-                ? "等待上一笔成交"
-                : `${side === "buy" ? "买入" : "卖出"} ${token.symbol}`}
+          {disabledReason ??
+            (side === "sell" && quantity <= 0
+              ? "还没有可卖的持仓"
+              : `${side === "buy" ? "买入" : "卖出"} ${token.symbol}`)}
         </ActionButton>
-        <ActionButton
-          secondary
+        <button
+          type="button"
+          className="td-observe"
           disabled={busy || preparing || !canTrade}
           onClick={() => void observe()}
         >
-          观察1分钟
-        </ActionButton>
-        <TrainingDisclosure title="更多设置" summary="成交保护与补充说明">
+          <Clock3 size={15} />
+          先不动，观察 1 分钟
+        </button>
+
+        <TrainingDisclosure title="交易设置" summary={`滑点 ${slippage}% · 有效期 ${validFor} 秒 · 随手记`}>
           <p className="mw-muted">
             买入时自动准备可用余额，兑换与调度费用记入账户。成交以执行时的行情为准。
           </p>
+          <div className="td-settings-row">
+            <span>滑点容忍</span>
+            <div className="td-presets td-presets-small">
+              {["1", "5", "10"].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={slippage === value}
+                  onClick={() => setSlippage(value)}
+                >
+                  {value}%
+                </button>
+              ))}
+            </div>
+          </div>
           <label className="mw-label">
-            滑点容忍度 · %
+            自定义滑点 · %
             <input
               value={slippage}
               onChange={(event) => setSlippage(event.target.value)}
@@ -675,113 +831,118 @@ export function TokenDetail({
           )}
         </TrainingDisclosure>
       </section>
-      {position && quantity > 0 && (
-        <section className="mw-panel">
-          <h3>我的持仓</h3>
-          <div className="mw-stats-row">
-            <Metric label="持有数量" value={compact(quantity)} sub={token.symbol} />
-            <Metric label="余仓成本" value={`$${money(cost)}`} />
-            <Metric label="预计净退出" value={`$${money(exitValue)}`} />
-            <Metric
-              label="退出后相对成本"
-              value={`${exitValue >= cost ? "+" : "−"}$${money(Math.abs(exitValue - cost))}`}
-              tone={exitValue >= cost ? "ok" : "bad"}
-            />
-          </div>
-          {!canExit && (
-            <div className="mw-notice mw-notice-danger">
-              <AlertTriangle size={18} />
-              <span>{exitReason ?? "当前无法退出"} · 净退出估值 $0.00</span>
-            </div>
-          )}
-          <p className="mw-muted">
-            自动保护 · 撤退参考{" "}
-            {position.stopPrice ? currencyCompact(position.stopPrice * fx) : "未设置"}
-            {" · "}目标参考{" "}
-            {position.targetPrice ? currencyCompact(position.targetPrice * fx) : "未设置"}
-            {world.config.assessmentVersion === "process-v2-trading" && " · 系统教学预设"}
-          </p>
-        </section>
-      )}
-      <TrainingDisclosure title="权限与公开线索" summary="地址、LP、持仓与证据来源">
-        <p>{token.narrative}。线索不是安全保证，持币地址不一定代表独立的人。</p>
-        <button
-          className="mw-contract"
-          type="button"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(token.address);
-              setCopied(true);
-            } catch {
-              toast.error("复制失败，可直接选择地址文本");
-            }
-          }}
-          title="复制模拟合约地址"
-        >
-          <span>{token.address}</span>
-          {copied ? <Check size={16} /> : <Copy size={16} />}
-          <span>模拟地址</span>
-        </button>
-        <div className="mw-facts">
-          {publicFacts.map((fact, index) => (
-            <div
-              className={`mw-fact mw-fact-${fact.tone}`}
-              key={`${fact.label}-${index}`}
-              data-testid="market-observation"
-              data-evidence-status={fact.status}
-            >
-              <div className="mw-fact-heading">
-                <span>{fact.label}</span>
-                <span>
-                  {
-                    (
-                      {
-                        confirmed: "已确认",
-                        inferred: "推测",
-                        unknown: "未知",
-                        expired: "已过期",
-                      } as const
-                    )[fact.status]
-                  }
-                </span>
-              </div>
-              <p>{fact.value}</p>
-              <div className="mw-evidence-meta">
-                <span>来源：{fact.source}</span>
-                <span>
-                  {simTime(fact.observedAt)} ·{" "}
-                  {fact.freshness === "current" ? "当前快照" : "信息陈旧"} · 证据置信{" "}
-                  {Math.round(fact.confidence * 100)}%
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="mw-muted">
-          置信程度描述证据，不是安全概率。锁 LP 不防大户卖币，过去能卖也不保证下一次退出。
-        </p>
-        <p className="mw-muted">观察期成交额 {currencyCompact(token.volume)}</p>
-      </TrainingDisclosure>
-      <TrainingDisclosure title="相关讨论" summary="已确认消息与虚构社区观点">
-        <MarketNews world={world} tokenId={token.id} compact />
-      </TrainingDisclosure>
-      <TrainingDisclosure title="本项目事件" summary="只看已发生的记录">
-        <div className="mw-event-list">
-          {world.events
-            .filter((event) => event.tokenId === token.id && event.at <= world.now)
-            .slice(-8)
-            .reverse()
-            .map((event) => (
-              <div className="mw-event" key={event.id}>
-                <time>{simTime(event.at)}</time>
-                <span>{event.message}</span>
+
+      <div className="td-info">
+        <TrainingDisclosure title="权限与公开线索" summary="地址、LP、持仓与证据来源">
+          <p>{token.narrative}。线索不是安全保证，持币地址不一定代表独立的人。</p>
+          <button
+            className="mw-contract"
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(token.address);
+                setCopied(true);
+              } catch {
+                toast.error("复制失败，可直接选择地址文本");
+              }
+            }}
+            title="复制模拟合约地址"
+          >
+            <span>{token.address}</span>
+            {copied ? <Check size={16} /> : <Copy size={16} />}
+            <span>模拟地址</span>
+          </button>
+          <div className="mw-facts">
+            {publicFacts.map((fact, index) => (
+              <div
+                className={`mw-fact mw-fact-${fact.tone}`}
+                key={`${fact.label}-${index}`}
+                data-testid="market-observation"
+                data-evidence-status={fact.status}
+              >
+                <div className="mw-fact-heading">
+                  <span>{fact.label}</span>
+                  <span>
+                    {
+                      (
+                        {
+                          confirmed: "已确认",
+                          inferred: "推测",
+                          unknown: "未知",
+                          expired: "已过期",
+                        } as const
+                      )[fact.status]
+                    }
+                  </span>
+                </div>
+                <p>{fact.value}</p>
+                <div className="mw-evidence-meta">
+                  <span>来源：{fact.source}</span>
+                  <span>
+                    {simTime(fact.observedAt)} ·{" "}
+                    {fact.freshness === "current" ? "当前快照" : "信息陈旧"} · 证据置信{" "}
+                    {Math.round(fact.confidence * 100)}%
+                  </span>
+                </div>
               </div>
             ))}
-          {!world.events.some((event) => event.tokenId === token.id) && (
-            <p className="mw-muted">暂无事件记录。</p>
-          )}
-        </div>
-      </TrainingDisclosure>
+          </div>
+          <p className="mw-muted">
+            置信程度描述证据，不是安全概率。锁 LP 不防大户卖币，过去能卖也不保证下一次退出。
+          </p>
+        </TrainingDisclosure>
+        <TrainingDisclosure title="相关讨论" summary="已确认消息与虚构社区观点">
+          <MarketNews world={world} tokenId={token.id} compact />
+        </TrainingDisclosure>
+        <TrainingDisclosure title="本项目事件" summary="只看已发生的记录">
+          <div className="mw-event-list">
+            {world.events
+              .filter((event) => event.tokenId === token.id && event.at <= world.now)
+              .slice(-8)
+              .reverse()
+              .map((event) => (
+                <div className="mw-event" key={event.id}>
+                  <time>{simTime(event.at)}</time>
+                  <span>{event.message}</span>
+                </div>
+              ))}
+            {!world.events.some((event) => event.tokenId === token.id) && (
+              <p className="mw-muted">暂无事件记录。</p>
+            )}
+          </div>
+        </TrainingDisclosure>
+      </div>
+
+      <div className={`td-dock ${tradeInView ? "is-hidden" : ""}`} aria-hidden={tradeInView}>
+        <button
+          type="button"
+          className="is-buy"
+          tabIndex={tradeInView ? -1 : 0}
+          disabled={!canTrade}
+          onClick={() => openTicket("buy")}
+        >
+          买入
+        </button>
+        <button
+          type="button"
+          className="is-sell"
+          tabIndex={tradeInView ? -1 : 0}
+          disabled={!canTrade || quantity <= 0}
+          onClick={() => openTicket("sell")}
+        >
+          卖出
+        </button>
+        <button
+          type="button"
+          className="td-dock-observe"
+          tabIndex={tradeInView ? -1 : 0}
+          aria-label="观察 1 分钟"
+          disabled={busy || preparing || !canTrade}
+          onClick={() => void observe()}
+        >
+          <Clock3 size={18} />
+        </button>
+      </div>
     </div>
   );
 }

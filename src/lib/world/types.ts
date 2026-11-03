@@ -39,8 +39,13 @@ export interface Pool {
 }
 export interface PricePoint {
   t: number;
+  /** Close of the sample window. */
   price: number;
   volume: number;
+  /** Previous close, and the extremes traded inside the window; absent on older saves. */
+  open?: number;
+  high?: number;
+  low?: number;
 }
 export interface Token {
   id: string;
@@ -70,6 +75,10 @@ export interface Token {
   peakPrice: number;
   trades: number;
   lastTradeAt?: number;
+  /** Last organic (non-chatter) trade; drives small background flow on tape-v1 worlds. */
+  flowAt?: number;
+  /** Price extremes since the last history sample. */
+  bar?: { high: number; low: number };
   /** Simulation private state. Never reveal in UI/AI before settlement. */
   latent: {
     intent: "honest" | "dump" | "pull" | "freeze" | "tax" | "mint";
@@ -242,6 +251,8 @@ export interface WorldConfig {
   generationProfile?: GenerationProfile;
   /** Optional to preserve the original grades and replay of existing worlds. */
   assessmentVersion?: "process-v1" | "process-v2-trading";
+  /** Continuous small flow on active projects; omitted on existing worlds to keep their replay. */
+  marketTape?: "tape-v1";
   spawnPerMinute: number;
   protection: boolean;
   duration: number;

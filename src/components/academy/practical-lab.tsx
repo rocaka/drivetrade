@@ -14,6 +14,8 @@ import { TextReveal, TrainingDisclosure } from "@/components/training-ui";
 import { TrainingSelect } from "@/components/training-select";
 import { formatPrice, money } from "@/lib/world/amount";
 import {
+  ADVANCED_LAB_CHALLENGES,
+  ADVANCED_RISK_CENTS,
   applyLabAction,
   evaluateLabs,
   LAB_CHALLENGES,
@@ -34,6 +36,8 @@ type Props = {
   runs: readonly LabRun[];
   onSave: (run: LabRun) => Promise<boolean>;
   onClose: () => void;
+  /** Opens another challenge; offered as "next" once this one is saved. */
+  onOpen?: (id: string) => void;
 };
 type Draft = { seed: string; actions: LabAction[] };
 const draftKey = (id: string) => `td-practical-draft-v1:${id}`;
@@ -52,11 +56,20 @@ function initialDraft(id: string): Draft {
   }
   return fresh();
 }
-export function PracticalLab({ challengeId, runs, onSave, onClose }: Props) {
+export function PracticalLab({ challengeId, runs, onSave, onClose, onOpen }: Props) {
   const [selected, setSelected] = useState(challengeId);
   useEffect(() => setSelected(challengeId), [challengeId]);
   const summary = useMemo(() => evaluateLabs(runs), [runs]);
+  const advanced = useMemo(() => evaluateLabs(runs, ADVANCED_LAB_CHALLENGES), [runs]);
   const picked = selected ? getLabChallenge(selected) : undefined;
+  const track = advanced.checks.some((c) => c.id === picked?.id) ? advanced : summary;
+  // Next unfinished challenge in the same track, wrapping around to earlier gaps.
+  const pickedIndex = track.checks.findIndex((c) => c.id === picked?.id);
+  const nextCheck = [
+    ...track.checks.slice(pickedIndex + 1),
+    ...track.checks.slice(0, Math.max(0, pickedIndex)),
+  ].find((c) => !c.passed);
+  const next = nextCheck ? getLabChallenge(nextCheck.id) : undefined;
   if (picked && picked.id.startsWith("trade-practice-"))
     return (
       <TradingSession
@@ -65,6 +78,10 @@ export function PracticalLab({ challengeId, runs, onSave, onClose }: Props) {
         runs={runs}
         onSave={onSave}
         onClose={() => (challengeId ? onClose() : setSelected(undefined))}
+        next={
+          next ? { title: next.title, open: () => (onOpen ?? setSelected)(next.id) } : undefined
+        }
+        progress={{ completed: track.completed, required: track.required }}
       />
     );
   if (picked)
@@ -106,6 +123,36 @@ export function PracticalLab({ challengeId, runs, onSave, onClose }: Props) {
                     : record.bestScore
                       ? `最高 ${record.bestScore} 分 · 继续练习`
                       : "待完成实际操作"}
+                </small>
+              </span>
+              <ChevronRight size={18} />
+            </button>
+          );
+        })}
+      </div>
+      <p className="academy-eyebrow lab-track-heading">
+        进阶实操 · 选做 · {advanced.completed} / {advanced.required}
+      </p>
+      <div className="lab-challenge-list">
+        {ADVANCED_LAB_CHALLENGES.map((c, i) => {
+          const record = advanced.checks[i];
+          return (
+            <button
+              key={c.id}
+              onClick={() => setSelected(c.id)}
+              data-testid={`lab-open-advanced-${i + 1}`}
+            >
+              <span className={`lab-number ${record.passed ? "is-done" : ""}`}>
+                {record.passed ? <Check size={17} /> : `进${i + 1}`}
+              </span>
+              <span>
+                <strong>{c.title}</strong>
+                <small>
+                  {record.passed
+                    ? "实操达标"
+                    : record.bestScore
+                      ? `最高 ${record.bestScore} 分 · 继续练习`
+                      : c.summary}
                 </small>
               </span>
               <ChevronRight size={18} />
@@ -654,7 +701,13 @@ function TradingSession({
   runs,
   onSave,
   onClose,
-}: Required<Pick<Props, "onSave" | "onClose" | "runs">> & { challengeId: string }) {
+  next,
+  progress,
+}: Required<Pick<Props, "onSave" | "onClose" | "runs">> & {
+  challengeId: string;
+  next?: { title: string; open: () => void };
+  progress: { completed: number; required: number };
+}) {
   const challenge = getLabChallenge(challengeId)!;
   const [draft, setDraft] = useState<Draft>(() => initialDraft(challengeId));
   const [tokenId, setTokenId] = useState("token-a");
@@ -731,6 +784,14 @@ function TradingSession({
   const pnl = labEquity(state) - state.initialEquityCents;
   const dollars = (n: number) => `$${money(n / 100)}`;
   const i = Number(challengeId.split("-").at(-1));
+  const isAdvanced = i > LAB_CHALLENGES.length;
+  // Loss if this buy is later sold at the stop, fees included (the 1R of this trade).
+  const riskCents =
+    buyQuote.units > 0
+      ? (enteredCents * Math.max(0, labPrice(token) - plan.stopPrice)) / labPrice(token) +
+        buyQuote.cycleCostCents
+      : 0;
+  const stopDistancePct = Math.max(0, (1 - plan.stopPrice / labPrice(token)) * 100);
   const goal =
     i === 3
       ? `跌到 $${formatPrice(plan.stopPrice)} 就先卖出，别继续等。`
@@ -750,7 +811,12 @@ function TradingSession({
         <ArrowLeft size={16} />
         返回练习
       </button>
-      <p className="academy-eyebrow">交易练习 · {i} / 12</p>
+      <p className="academy-eyebrow">
+        {isAdvanced
+          ? `进阶实操 · ${i - LAB_CHALLENGES.length} / ${progress.required}`
+          : `交易练习 · ${i} / 12`}{" "}
+        · 已达标 {progress.completed}
+      </p>
       <TextReveal as="h2" text={challenge.title} />
       <p className="lab-goal">{goal}</p>
       <div className="lab-account">
@@ -801,18 +867,37 @@ function TradingSession({
               </div>
             ))}
           </div>
-          <Button disabled={saving || saved} onClick={() => void finish()}>
-            {saved ? (
-              <>
-                <Check size={17} />
-                本次记录已保存
-              </>
-            ) : saving ? (
-              "正在保存…"
-            ) : (
-              "保存这次练习"
-            )}
-          </Button>
+          {saved && result.passed && next ? (
+            <Button onClick={next.open}>
+              下一项：{next.title}
+              <ArrowRight size={16} />
+            </Button>
+          ) : saved && result.passed && progress.completed === progress.required ? (
+            <p className="lab-inline-state" role="status">
+              {isAdvanced
+                ? "4 项进阶实操全部达标。到自由市场里，用同样的规则做满 30 笔再看统计。"
+                : "12 项实操全部达标。可以去「进度」页开始模拟交易考核。"}
+            </p>
+          ) : (
+            <Button disabled={saving || saved} onClick={() => void finish()}>
+              {saved ? (
+                <>
+                  <Check size={17} />
+                  本次记录已保存
+                </>
+              ) : saving ? (
+                "正在保存…"
+              ) : (
+                "保存这次练习"
+              )}
+            </Button>
+          )}
+          {saved && result.passed ? (
+            <p className="lab-saved-note">
+              <Check size={14} />
+              本次记录已保存 · 实操达标 {progress.completed} / {progress.required}
+            </p>
+          ) : null}
           <div className="lab-two-actions">
             <Button
               variant="ghost"
@@ -925,6 +1010,21 @@ function TradingSession({
                     ? `预计买到 ${(buyQuote.units / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 4 })} ${token.symbol} · 往返费用约 ${dollars(buyQuote.cycleCostCents)}`
                     : "输入小额试试"}
                 </p>
+                {buyQuote.units > 0 ? (
+                  <p
+                    className={`lab-risk-line ${(i === 13 || i === 16) && (riskCents > ADVANCED_RISK_CENTS || riskCents < ADVANCED_RISK_CENTS / 2) ? "is-off" : ""}`}
+                  >
+                    这笔的 1R：跌到先撤价（−{stopDistancePct.toFixed(0)}%）约亏{" "}
+                    {dollars(Math.round(riskCents))}
+                    {i === 13 || i === 16
+                      ? riskCents > ADVANCED_RISK_CENTS
+                        ? " · 超过本关 $1，买少一点"
+                        : riskCents < ADVANCED_RISK_CENTS / 2
+                          ? " · 不到 $0.50，可以再多一点"
+                          : " · 在 $0.50–$1 之间 ✓"
+                      : ""}
+                  </p>
+                ) : null}
                 <Button
                   disabled={
                     saving || pending || !Number.isFinite(enteredCents) || enteredCents < 20

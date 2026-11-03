@@ -141,7 +141,9 @@ test("invalid numeric plans reject before submission and public snapshots contai
   assert.equal(result.world.transactions.length, 0);
 });
 test("failed timeout exit remains an attempted exit and does not repeatedly burn gas", () => {
-  let { world: w, token } = buy(createWorld(config));
+  const bought = buy(createWorld(config));
+  const token = bought.token;
+  let w = bought.world;
   w = stepWorld(w, 3);
   const actual = w.tokens.find((t) => t.id === token.id)!;
   actual.frozen = true;

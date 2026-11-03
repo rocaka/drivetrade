@@ -32,3 +32,6 @@ attachments/
 *.key
 *.p12
 *.pfx
+
+# Local Claude Code preview settings
+.claude/

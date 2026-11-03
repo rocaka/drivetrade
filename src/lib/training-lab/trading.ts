@@ -4,14 +4,17 @@ import type {
   LabAction,
   LabChallenge,
   LabCheck,
+  LabEntry,
   LabResult,
-  LabRun,
   LabState,
   LabToken,
   LabTradePlan,
 } from "./types.ts";
 
-const lessonNumbers = [4, 7, 10, 11, 3, 14, 18, 20, 7, 15, 17, 24];
+const lessonIds = [
+  ...[4, 7, 10, 11, 3, 14, 18, 20, 7, 15, 17, 24].map((n) => `trade-lesson-${n}`),
+  ...[3, 8, 9, 2].map((n) => `profit-lesson-${n}`),
+];
 const specs = [
   [
     "先定仓位",
@@ -85,27 +88,71 @@ const specs = [
     "完成一次小额买入和卖出，回看入场、退出和扣费后的真实结果。",
     16,
   ],
+  // Advanced track: optional, scored separately from the 12 required exercises.
+  [
+    "按 1R 算仓位",
+    "风险预算决定买多少，不是心情。",
+    "本关每笔最多承担 $1 风险：投入 × 跌到先撤价的跌幅 + 往返费用 ≤ $1。按这个算出金额买入，再卖出。",
+    3,
+  ],
+  [
+    "保本保护余仓",
+    "目标先兑现一部分，余仓不让它变亏。",
+    "开场已有仓位。到目标先卖一部分；之后若回落到成本附近，就把余仓卖掉，别让盈利单变成亏损单。",
+    8,
+  ],
+  [
+    "时间止损",
+    "该动没动，就按时离场。",
+    "买入后最多持有 4 步（2分钟）。行情横着不动、没到目标，就按时卖出，不硬等。",
+    9,
+  ],
+  [
+    "三笔同样的风险",
+    "止损远就买少，每笔风险一样大。",
+    "A、B、C 三个项目的先撤价远近不同。依次各做一笔，每笔风险控制在 $0.5–$1，做完一笔再做下一笔。",
+    2,
+  ],
 ] as const;
-export const TRADING_LAB_CHALLENGES: LabChallenge[] = specs.map((x, i) => ({
+/** Exercise 16: stop distance per project (8%, 15%, 25%). */
+const EQUAL_RISK_STOPS: Record<string, number> = { "token-a": 0.92, "token-b": 0.85 };
+/** Exercises 1–12 count toward the practice requirement; 13+ are the advanced track. */
+export const REQUIRED_LAB_COUNT = 12;
+/** Most a single advanced trade may lose at the given stop, fees included. */
+export const ADVANCED_RISK_CENTS = 100;
+function labRules(i: number) {
+  const budget =
+    i === 7
+      ? "关联持仓总投入上限 $10"
+      : i === 12 || i === 15
+        ? "每笔风险 ≤ $1：投入 × 跌到先撤价的跌幅 + 往返费用"
+        : "单项目新增投入上限 $8（包含执行费）";
+  return [
+    budget,
+    i === 14
+      ? "买入后最多持有 4 步；到时没到目标就卖出"
+      : "买入区、撤退价和目标由本关给出，不需要填写表格",
+    "每步30模拟秒；成绩看实际交易行为，不要求每笔赚钱",
+  ];
+}
+const ALL_TRADING_LABS: LabChallenge[] = specs.map((x, i) => ({
   id: `trade-practice-${i + 1}`,
   title: x[0],
   summary: x[1],
   goal: x[2],
-  lessonId: `trade-lesson-${lessonNumbers[i]}`,
+  lessonId: lessonIds[i],
   maxSteps: 12,
   targetId: i === 5 || i === 8 ? "token-b" : "token-a",
-  rules: [
-    i === 7 ? "关联持仓总投入上限 $10" : "单项目新增投入上限 $8（包含执行费）",
-    "买入区、撤退价和目标由本关给出，不需要填写表格",
-    "每步30模拟秒；成绩看实际交易行为，不要求每笔赚钱",
-  ],
+  rules: labRules(i),
 }));
+export const TRADING_LAB_CHALLENGES = ALL_TRADING_LABS.slice(0, REQUIRED_LAB_COUNT);
+export const ADVANCED_LAB_CHALLENGES = ALL_TRADING_LABS.slice(REQUIRED_LAB_COUNT);
 const SCALE = 1_000_000,
   GAS = 10;
 const clone = <T>(x: T): T => structuredClone(x);
 const index = (s: LabState) => Number(s.challengeId.split("-").at(-1)) - 1;
 const def = (id: string) => {
-  const found = TRADING_LAB_CHALLENGES.find((c) => c.id === id);
+  const found = ALL_TRADING_LABS.find((c) => c.id === id);
   if (!found) throw new Error("交易实操关卡不存在");
   return found;
 };
@@ -184,8 +231,8 @@ export function createTradingLab(id: string, seed: string): LabState {
   s.cash = { solana: 99600, base: 0 };
   s.gas = { solana: 400, base: 0 };
   s.tokens = [baseToken(s, "token-a", "月面电台", "MOON", i === 5 || i === 8 ? 2000 : 100000)];
-  if ([5, 7, 8, 10].includes(i)) s.tokens.push(baseToken(s, "token-b", "松果计划", "PINE"));
-  if (i === 7 || i === 8) s.tokens.push(baseToken(s, "token-c", "纸飞机", "PAPER"));
+  if ([5, 7, 8, 10, 15].includes(i)) s.tokens.push(baseToken(s, "token-b", "松果计划", "PINE"));
+  if (i === 7 || i === 8 || i === 15) s.tokens.push(baseToken(s, "token-c", "纸飞机", "PAPER"));
   s.trading = {
     actionCount: 0,
     plans: {},
@@ -205,7 +252,7 @@ export function createTradingLab(id: string, seed: string): LabState {
     npcMove(s, s.tokens[0], s.tokens[0].initialPrice * 1.18);
     s.tokens[0].history.push({ step: 0, price: legacy.labPrice(s.tokens[0]) });
   }
-  if ([2, 3, 6].includes(i)) seedHolding(s, s.tokens[0], 800);
+  if ([2, 3, 6, 13].includes(i)) seedHolding(s, s.tokens[0], 800);
   if (i === 7) for (const t of s.tokens) seedHolding(s, t, 800);
   if (i === 8) {
     npcMove(s, s.tokens[2], s.tokens[2].initialPrice * 0.84);
@@ -258,12 +305,23 @@ export function createTradingLab(id: string, seed: string): LabState {
       stopPrice = base * 0.7;
       targetPrice = base * 2.5;
     }
+    if (i === 12) {
+      stopPrice = current * 0.8;
+      targetPrice = current * 1.5;
+    }
+    if (i === 13) targetPrice = current * 1.2;
+    if (i === 14) {
+      stopPrice = current * 0.85;
+      targetPrice = current * 1.3;
+    }
+    // Different stop distances, so equal risk needs different amounts.
+    if (i === 15) stopPrice = current * (EQUAL_RISK_STOPS[token.id] ?? 0.75);
     s.trading.plans[token.id] = {
       entryPrice,
       stopPrice,
       targetPrice,
       maxCents: 800,
-      maxHoldSteps: 6,
+      maxHoldSteps: i === 14 ? 4 : 6,
       frozenAt: 0,
       actionIndex: 0,
       source: "system",
@@ -387,6 +445,8 @@ function advance(s: LabState): LabState {
     else if (i === 4 && s.step === 2) npcMove(s, t, base * 0.94);
     else if (i === 4 && s.step === 4) npcMove(s, t, base * 1.22);
     else if (i === 9 && s.step === 1) npcMove(s, t, base * 1.5);
+    else if (i === 13 && [2, 4, 6, 7, 8].includes(s.step))
+      npcMove(s, t, base * { 2: 1.3, 4: 1.45, 6: 1.08, 7: 0.9, 8: 0.8 }[s.step]!);
     else {
       const stable = 1 + (s.step % 2 ? -0.0015 : 0.001);
       npcMove(s, t, legacy.labPrice(t) * stable);
@@ -528,6 +588,16 @@ export function applyTradingLabAction(input: LabState, action: LabAction): LabSt
   } else s = delegated(s, action);
   return s;
 }
+/** Loss if the entry is sold at its stop, including the estimated round-trip cost. */
+export function entryRiskCents(
+  entry: Pick<LabEntry, "cents" | "price" | "estimatedCostCents" | "plan">,
+) {
+  if (!entry.plan || entry.price <= 0) return Infinity;
+  return (
+    (entry.cents * Math.max(0, entry.price - entry.plan.stopPrice)) / entry.price +
+    entry.estimatedCostCents
+  );
+}
 function check(id: string, title: string, passed: boolean, detail: string): LabCheck {
   return { id, title, passed, detail };
 }
@@ -645,6 +715,56 @@ export function tradingLabResult(s: LabState): LabResult {
     taskTitle = "留下一笔完整的交易记录";
     detail =
       "系统自动记录当时买价、卖价、数量和实际费用；完成买入并全部卖出。文字笔记可选，不参与成绩。";
+  }
+  if (i === 12) {
+    task =
+      round &&
+      entries.every((x) => {
+        const risk = entryRiskCents(x);
+        return risk <= ADVANCED_RISK_CENTS && risk >= ADVANCED_RISK_CENTS / 2;
+      });
+    taskTitle = "仓位由 1R 风险算出";
+    detail = "每笔风险在 $0.5–$1 之间：不超预算，也别小到失去意义。";
+  }
+  if (i === 13) {
+    const costPrice = primary.initialPrice;
+    task =
+      held === 0 &&
+      e.exits.some(
+        (x) =>
+          x.tokenId === primary.id && x.targetReached && x.percent < 100 && x.remainingUnits > 0,
+      ) &&
+      e.exits.some(
+        (x) => x.tokenId === primary.id && x.remainingUnits === 0 && x.price >= costPrice,
+      );
+    taskTitle = "先兑现一部分，余仓在成本之上离场";
+    detail = "到目标先卖25%或50%；回落时在跌破开场成本价之前卖完余仓。";
+  }
+  if (i === 14) {
+    task =
+      round &&
+      entries.every((x) => {
+        const last = e.exits.find(
+          (y) => y.tokenId === x.tokenId && y.actionIndex > x.actionIndex && y.remainingUnits === 0,
+        );
+        return !!last && last.step - x.step >= 2 && !last.targetReached;
+      });
+    taskTitle = "给足机会，到时间就走";
+    detail = "买入后至少观察2步；没到目标就在第4步内卖出。";
+  }
+  if (i === 15) {
+    const tokens = new Set(entries.map((x) => x.tokenId));
+    task =
+      round &&
+      tokens.size === 3 &&
+      entries.length === 3 &&
+      e.peakPositions <= 1 &&
+      entries.every((x) => {
+        const risk = entryRiskCents(x);
+        return risk <= ADVANCED_RISK_CENTS && risk >= ADVANCED_RISK_CENTS / 2;
+      });
+    taskTitle = "三笔风险一样大";
+    detail = "A、B、C 各一笔，每笔风险 $0.5–$1；先撤价越远，买入金额越小。";
   }
   checks.push(check("competency", taskTitle, task, detail));
   const plansOkay =

@@ -1,4 +1,12 @@
-import { useEffect, useState, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 
@@ -24,6 +32,79 @@ export function Overlay({
       {children}
     </div>,
     document.body,
+  );
+}
+
+/** Bottom sheet on phones, centred card on wider screens. Esc and backdrop close it; focus returns to the opener. */
+export function Dialog({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      opener?.focus?.();
+    };
+  }, []);
+
+  return (
+    <Overlay
+      className="sheet-backdrop fixed inset-0 z-40 flex items-end justify-center bg-bg/80 px-4 pb-[max(env(safe-area-inset-bottom,0px),1.25rem)] backdrop-blur-sm sm:items-center"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={(node) => {
+          // The portal mounts a render after this component, so focus when the node attaches.
+          if (node && !panelRef.current) node.focus();
+          panelRef.current = node;
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="sheet-panel w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl outline-none"
+      >
+        <h2 id={titleId} className="text-base font-semibold">
+          {title}
+        </h2>
+        {children}
+      </div>
+    </Overlay>
   );
 }
 

@@ -35,6 +35,8 @@ import {
   CURRICULUM_VERSION,
   LESSONS,
   STATIONS,
+  PROFIT_LESSONS,
+  PROFIT_STATIONS,
   LEGACY_LESSONS,
   LEGACY_STATIONS,
   getLessonById,
@@ -69,8 +71,14 @@ import {
   type ProfitGroup,
 } from "@/lib/academy/store";
 import { REGIME_LABELS } from "@/lib/academy/grading";
-import { LAB_CHALLENGES, getLabChallenge } from "@/lib/training-lab/engine";
+import {
+  ADVANCED_LAB_CHALLENGES,
+  LAB_CHALLENGES,
+  evaluateLabs,
+  getLabChallenge,
+} from "@/lib/training-lab/engine";
 import { PracticalLab } from "./practical-lab";
+import { ProfitSimulator } from "./profit-simulator";
 import "./academy.css";
 
 type Props = {
@@ -181,6 +189,21 @@ export function AcademyScreen({
   }, [view, lessonId, scenario?.id, labId, knowledgeOpen, reviewSeed]);
   const evaluation = useMemo(() => academyEvaluation(data), [data]);
   const mastered = useMemo(() => new Set(completedLessonIds(data)), [data]);
+  const profitMastered = useMemo(
+    () =>
+      new Set(
+        PROFIT_LESSONS.filter((l) =>
+          data.lessonAttempts.some((a) => a.lessonId === l.id && a.answer === l.question.answer),
+        ).map((l) => l.id),
+      ),
+    [data],
+  );
+  const advancedLabs = useMemo(
+    () => evaluateLabs(data.labRuns ?? [], ADVANCED_LAB_CHALLENGES),
+    [data],
+  );
+  const nextProfitLesson =
+    PROFIT_LESSONS.find((l) => !profitMastered.has(l.id)) ?? PROFIT_LESSONS[0];
   const profitGroup = currentProfitGroup(data);
   const reviewSlot = data.profitGroups
     .flatMap((g) => g.slots)
@@ -213,6 +236,43 @@ export function AcademyScreen({
     setReviewSeed(null);
     if (reviewSeed) onNavigate?.({ page: "academy", view });
   }
+  // An open exercise, lesson or practice quiz gets its own history entry, so Back (or the swipe
+  // gesture) returns to the hub instead of leaving training. Formal exam rounds are left out so
+  // Back can't abandon a graded attempt.
+  const detailKey =
+    labId ??
+    lessonId ??
+    (scenario && !scenario.formal ? scenario.id : null) ??
+    (knowledgeOpen ? "knowledge" : null);
+  const shownDetail = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = shownDetail.current;
+    shownDetail.current = detailKey;
+    const state: unknown = window.history.state;
+    const marked =
+      typeof state === "object" && state !== null && "academyDetail" in state
+        ? (state as { academyDetail: unknown }).academyDetail
+        : null;
+    if (detailKey && !previous)
+      window.history.pushState({ ...(state as object), academyDetail: detailKey }, "");
+    else if (detailKey && previous && marked)
+      window.history.replaceState({ ...(state as object), academyDetail: detailKey }, "");
+    else if (!detailKey && previous && marked) window.history.back();
+  }, [detailKey]);
+  useEffect(() => {
+    const onPop = () => {
+      const state: unknown = window.history.state;
+      const marked = typeof state === "object" && state !== null && "academyDetail" in state;
+      if (marked || !shownDetail.current) return;
+      shownDetail.current = null;
+      setLabId(null);
+      setLessonId(null);
+      setScenario((current) => (current?.formal ? current : null));
+      setKnowledgeOpen(false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   function navigate(next: AcademyView) {
     returnHub();
     setView(next);
@@ -420,6 +480,7 @@ export function AcademyScreen({
                   runs={data.labRuns ?? []}
                   onSave={(run) => useAcademy.getState().recordLabRun(run)}
                   onClose={returnHub}
+                  onOpen={setLabId}
                 />
               ) : lessonId ? (
                 <LessonReader
@@ -552,6 +613,63 @@ export function AcademyScreen({
                       })}
                     </div>
                   </TrainingDisclosure>
+                  <TrainingDisclosure
+                    title="进阶：怎样做到稳定盈利"
+                    summary={`${profitMastered.size}/${PROFIT_LESSONS.length} 课 · ${advancedLabs.completed}/${advancedLabs.required} 项进阶实操 · 附模拟器`}
+                    className="academy-profit-track"
+                  >
+                    <section className="academy-next">
+                      <p className="academy-eyebrow">稳定盈利 = 正期望 × 小仓位 × 足够多次</p>
+                      <h3>{nextProfitLesson.title}</h3>
+                      <p>{nextProfitLesson.summary}</p>
+                      <Button variant="ghost" onClick={() => setLessonId(nextProfitLesson.id)}>
+                        读这一课
+                        <BookOpen size={17} />
+                      </Button>
+                    </section>
+                    <div className="academy-route">
+                      {PROFIT_STATIONS.map((station, index) => {
+                        const lessons = PROFIT_LESSONS.filter((l) => l.station === index),
+                          count = lessons.filter((l) => profitMastered.has(l.id)).length;
+                        return (
+                          <TrainingDisclosure
+                            key={station.title}
+                            title={`${String(index + 1).padStart(2, "0")}  ${station.title}`}
+                            summary={`${station.subtitle} · ${count}/${lessons.length}`}
+                            className="academy-station"
+                          >
+                            <div className="academy-link-list">
+                              {lessons.map((l) => (
+                                <button
+                                  className="academy-list-row"
+                                  key={l.id}
+                                  onClick={() => setLessonId(l.id)}
+                                >
+                                  <span className="academy-list-label">
+                                    {profitMastered.has(l.id) ? (
+                                      <CheckCircle2 size={17} className="is-good" />
+                                    ) : (
+                                      <span className="academy-node" />
+                                    )}
+                                    <span>{l.title}</span>
+                                  </span>
+                                  <ChevronRight size={17} />
+                                </button>
+                              ))}
+                            </div>
+                          </TrainingDisclosure>
+                        );
+                      })}
+                    </div>
+                    <button className="academy-bridge" onClick={() => navigate("practice")}>
+                      <span>
+                        <strong>4 项进阶实操</strong>
+                        <small>按 1R 算仓位、保本保护余仓、时间止损、三笔同风险。</small>
+                      </span>
+                      <ArrowRight size={18} />
+                    </button>
+                    <ProfitSimulator />
+                  </TrainingDisclosure>
                   <p className="academy-footnote">虚拟资金 · 操作自动记录 · 想看知识点时再展开</p>
                 </>
               )}
@@ -587,11 +705,15 @@ export function AcademyScreen({
                       return (
                         <button
                           key={c.id}
-                          className="academy-list-row"
+                          className={`academy-list-row ${grade?.passed ? "is-done" : ""}`}
                           onClick={() => setLabId(c.id)}
                         >
                           <span className="academy-list-index">
-                            {String(i + 1).padStart(2, "0")}
+                            {grade?.passed ? (
+                              <Check size={15} aria-label="已达标" />
+                            ) : (
+                              String(i + 1).padStart(2, "0")
+                            )}
                           </span>
                           <span className="academy-list-copy">
                             <strong>{c.title}</strong>
@@ -604,6 +726,42 @@ export function AcademyScreen({
                       );
                     })}
                   </div>
+                  <section className="academy-advanced-labs" aria-label="进阶实操">
+                    <p className="academy-eyebrow">
+                      进阶实操 · 选做 · {advancedLabs.completed} / {advancedLabs.required}
+                    </p>
+                    <h3>把盈利习惯练成肌肉记忆</h3>
+                    <p className="academy-support">
+                      不计入 12 项要求，配合「进阶：怎样做到稳定盈利」小课练习。
+                    </p>
+                    <div className="academy-link-list">
+                      {ADVANCED_LAB_CHALLENGES.map((c, i) => {
+                        const grade = advancedLabs.checks.find((v) => v.id === c.id);
+                        return (
+                          <button
+                            key={c.id}
+                            className={`academy-list-row ${grade?.passed ? "is-done" : ""}`}
+                            onClick={() => setLabId(c.id)}
+                          >
+                            <span className="academy-list-index">
+                              {grade?.passed ? (
+                                <Check size={15} aria-label="已达标" />
+                              ) : (
+                                `进${i + 1}`
+                              )}
+                            </span>
+                            <span className="academy-list-copy">
+                              <strong>{c.title}</strong>
+                              <small>
+                                {grade?.passed ? `已达标 · 最佳${grade.bestScore}分` : c.summary}
+                              </small>
+                            </span>
+                            <ChevronRight size={17} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
                   <TrainingDisclosure
                     title="想多理解一点（选做）"
                     summary="交易例子与小测，不是毕业前置"
@@ -1543,8 +1701,9 @@ function LessonReader({
 }) {
   const lesson = getLessonById(lessonId)!;
   const legacyCourse = LEGACY_LESSONS.some((item) => item.id === lessonId);
-  const course = legacyCourse ? LEGACY_LESSONS : LESSONS;
-  const stations = legacyCourse ? LEGACY_STATIONS : STATIONS;
+  const profitCourse = PROFIT_LESSONS.some((item) => item.id === lessonId);
+  const course = legacyCourse ? LEGACY_LESSONS : profitCourse ? PROFIT_LESSONS : LESSONS;
+  const stations = legacyCourse ? LEGACY_STATIONS : profitCourse ? PROFIT_STATIONS : STATIONS;
   const [draft, setDraft] = useDraft(`lesson:${lessonId}`, () => ({
     answer: undefined as number | undefined,
     submitted: false,
@@ -1564,7 +1723,7 @@ function LessonReader({
         {draft.phase === "check" ? "回看课程" : "学习路线"}
       </Back>
       <p className="academy-eyebrow">
-        {legacyCourse ? "旧版原课 · " : "选读 · "}
+        {legacyCourse ? "旧版原课 · " : profitCourse ? "进阶 · " : "选读 · "}
         {stations[lesson.station].title} · 第{course.findIndex((item) => item.id === lesson.id) + 1}
         课
       </p>

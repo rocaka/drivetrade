@@ -35,8 +35,6 @@ import type {
   CommandResult,
   GasTopupQuote,
   Participant,
-  Pool,
-  Position,
   Quote,
   Side,
   Token,
@@ -250,7 +248,12 @@ function movePool(w: World, token: Token, side: Side, amount: Atom, q: Quote) {
     token.chain,
     side === "buy" ? amount : str(n(q.amountOut) + external),
   );
-  token.peakPrice = Math.max(token.peakPrice, tokenPrice(token));
+  const after = tokenPrice(token);
+  token.peakPrice = Math.max(token.peakPrice, after);
+  // Extremes between history samples, so candles keep their wicks.
+  token.bar = token.bar
+    ? { high: Math.max(token.bar.high, after), low: Math.min(token.bar.low, after) }
+    : { high: after, low: after };
   if (p.kind === "curve" && n(p.quote) >= (n(p.targetQuote) * 995n) / 1000n) {
     token.status = "migrating";
     p.migratedAt = w.now + chainSpec(token.chain).blockSeconds * 3;
@@ -513,6 +516,42 @@ function background(w: World) {
         (npc.style === "whale" ? 50 : 3) +
         random(seed, "npc-size", index) * (npc.style === "whale" ? 150 : 30);
       npcTrade(w, npc, t, "buy", a(spendUsd / w.fx[t.chain]));
+    }
+    if (w.config.marketTape === "tape-v1" && t.lastTradeAt === w.now) t.flowAt = w.now;
+  }
+  if (w.config.marketTape === "tape-v1") chatter(w, seed, ordinary, active);
+}
+
+/** Seconds after the last organic trade over which chatter fades out. */
+const CHATTER_FADE = 300;
+
+/**
+ * Small two-way orders on projects that drew real flow recently, so active charts trade
+ * continuously instead of sitting flat between larger orders. Chatter never keeps a project hot.
+ */
+function chatter(w: World, seed: string, traders: Participant[], active: Token[]) {
+  const hot = active
+    .filter((t) => !t.easterEgg && t.flowAt !== undefined && w.now - t.flowAt <= CHATTER_FADE)
+    .sort((x, y) => y.flowAt! - x.flowAt! || (x.id < y.id ? -1 : 1))
+    .slice(0, 16);
+  for (const t of hot) {
+    const index = `${w.now}:${t.address}`;
+    const quiet = (w.now - t.flowAt!) / CHATTER_FADE;
+    if (random(seed, "chatter", index) > (0.25 + t.latent.appeal * 0.45) * (1 - quiet * 0.75))
+      continue;
+    // Short-term momentum: recent gains attract buyers, recent losses shake out holders.
+    const price = tokenPrice(t),
+      earlier = t.history.at(-3)?.price ?? price;
+    const lean = earlier > 0 ? Math.max(-0.18, Math.min(0.18, (price / earlier - 1) * 0.6)) : 0;
+    const holders = traders.filter((p) => n(p.tokens[t.id] ?? ZERO) > 0n);
+    if (holders.length && random(seed, "chatter-side", index) > 0.5 + lean) {
+      const seller = pick(holders, seed, "chatter-seller", index);
+      const fraction = 8n + BigInt(Math.floor(random(seed, "chatter-sell", index) * 50));
+      npcTrade(w, seller, t, "sell", str((n(seller.tokens[t.id]!) * fraction) / 100n));
+    } else {
+      const buyer = pick(traders, seed, "chatter-buyer", index);
+      const spendUsd = 0.5 + random(seed, "chatter-size", index) ** 2 * 24;
+      npcTrade(w, buyer, t, "buy", a(spendUsd / w.fx[t.chain]));
     }
   }
 }
@@ -781,7 +820,18 @@ export function createWorld(config: WorldConfig): World {
 
 function history(w: World) {
   for (const t of w.tokens) {
-    const point = { t: w.now, price: tokenPrice(t), volume: rounded(t.volume) };
+    const price = tokenPrice(t),
+      previous = t.history.at(t.history.at(-1)?.t === w.now ? -2 : -1),
+      open = previous?.price ?? price;
+    const point = {
+      t: w.now,
+      price,
+      volume: rounded(t.volume),
+      open,
+      high: Math.max(open, price, t.bar?.high ?? price),
+      low: Math.min(open, price, t.bar?.low ?? price),
+    };
+    delete t.bar;
     if (t.history.at(-1)?.t === w.now) t.history[t.history.length - 1] = point;
     else t.history.push(point);
     if (t.history.length > 240) t.history.splice(0, t.history.length - 240);

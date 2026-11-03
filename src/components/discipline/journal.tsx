@@ -103,6 +103,10 @@ export function JournalScreen({
       toast.error("币种、买入理由、止损、止盈都要写");
       return;
     }
+    if (form.date && form.date > todayISO()) {
+      toast.error("日期不能晚于今天");
+      return;
+    }
     if (!form.followedPlan && !deviationReason) {
       toast.error("没按计划走，写一句偏差原因");
       return;
@@ -165,6 +169,7 @@ export function JournalScreen({
           <Field label="日期">
             <input
               type="date"
+              max={todayISO()}
               className={fieldClass}
               value={form.date}
               onChange={(event) => set("date", event.target.value)}
@@ -289,9 +294,14 @@ function LiveReturn({ stake, pnl }: { stake: string; pnl: string }) {
   const ret = (pnlParsed.value / stakeParsed.value) * 100;
   const up = pnlParsed.value >= 0;
   return (
-    <p className={cn("mb-3 font-mono text-sm tabular-nums", up ? "text-ok" : "text-bad")}>
-      本笔收益率 {ret > 0 ? "+" : ""}
-      {ret.toFixed(1)}%
-    </p>
+    <div className="mb-3">
+      <p className={cn("font-mono text-sm tabular-nums", up ? "text-ok" : "text-bad")}>
+        本笔收益率 {ret > 0 ? "+" : ""}
+        {ret.toFixed(1)}%
+      </p>
+      {ret < -100 ? (
+        <p className="mt-1 text-xs text-bad">亏损超过了投入。确认是不是填错了，或者用了杠杆。</p>
+      ) : null}
+    </div>
   );
 }

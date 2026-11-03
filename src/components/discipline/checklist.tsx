@@ -35,11 +35,11 @@ export function ChecklistScreen({ onPass }: { onPass: () => void }) {
                     role="checkbox"
                     aria-checked={on}
                     onClick={() => toggle(rule.id)}
-                    className="flex w-full items-start gap-3 px-4 py-3.5 text-left"
+                    className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition hover:bg-surface-2/40"
                   >
                     <span
                       className={cn(
-                        "mt-0.5 grid size-6 shrink-0 place-items-center border",
+                        "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md border transition",
                         on ? "border-primary bg-primary text-primary-fg" : "border-line bg-bg text-transparent",
                       )}
                     >
@@ -62,9 +62,17 @@ export function ChecklistScreen({ onPass }: { onPass: () => void }) {
         )}
       </Card>
 
-      <p className="text-center font-mono text-xs text-muted tabular-nums">
-        {done} / {active.length}
-      </p>
+      <div className="flex items-center gap-3 px-1" aria-live="polite">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+          <div
+            className={cn("h-full rounded-full transition-all duration-500", allChecked ? "bg-ok" : "bg-primary")}
+            style={{ width: `${active.length === 0 ? 0 : (done / active.length) * 100}%` }}
+          />
+        </div>
+        <p className="font-mono text-xs text-muted tabular-nums">
+          {done} / {active.length}
+        </p>
+      </div>
       <Button variant="ok" disabled={!allChecked} onClick={onPass}>
         {allChecked ? "全部确认，开始记录" : "还有未确认的铁律"}
       </Button>

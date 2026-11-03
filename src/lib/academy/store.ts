@@ -15,8 +15,6 @@ import {
   getKnowledgeQuestionsForAttempt,
 } from "./content.ts";
 import {
-  FORMAL_SCENARIOS,
-  PRACTICE_SCENARIOS,
   gradeScenario,
   getScenarioById,
   scenariosForRound,
@@ -344,9 +342,8 @@ async function readData(): Promise<AcademyData> {
       if (req.result === undefined) resolve(blank());
       else {
         const result = schema.safeParse(req.result);
-        result.success
-          ? resolve(result.data)
-          : reject(new Error("学习数据版本或证据损坏，请先导出备份"));
+        if (result.success) resolve(result.data);
+        else reject(new Error("学习数据版本或证据损坏，请先导出备份"));
       }
     };
     req.onerror = () => reject(req.error);

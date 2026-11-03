@@ -65,12 +65,12 @@ type MarketFilters = {
 };
 const MARKET_PAGE_SIZE = 24;
 export function MarketWorld({
-  onBack,
   onAcademy,
   initialView,
   navigationKey,
   onViewChange,
 }: {
+  /** Kept for callers; the shell provides its own back navigation. */
   onBack: () => void;
   onAcademy: (reviewSeed?: string) => void;
   initialView?: View;
@@ -103,6 +103,25 @@ export function MarketWorld({
   useEffect(() => {
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [selectedId, view, accountView]);
+  // Give an open token its own history entry so Back (or the swipe gesture) returns to the list
+  // instead of leaving the market. The app's popstate sync resets the selection.
+  const shownTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = shownTokenRef.current;
+    shownTokenRef.current = selectedId;
+    const state: unknown = window.history.state;
+    const marked =
+      typeof state === "object" && state !== null && "mwToken" in state
+        ? (state as { mwToken: unknown }).mwToken
+        : null;
+    if (selectedId && !previous) {
+      window.history.pushState({ ...(state as object), mwToken: selectedId }, "");
+    } else if (selectedId && previous && selectedId !== previous && marked) {
+      window.history.replaceState({ ...(state as object), mwToken: selectedId }, "");
+    } else if (!selectedId && previous && marked === previous) {
+      window.history.back();
+    }
+  }, [selectedId]);
   const [setup, setSetup] = useState(false);
   const [finishConfirm, setFinishConfirm] = useState(false);
   const [abandoning, setAbandoning] = useState(false);

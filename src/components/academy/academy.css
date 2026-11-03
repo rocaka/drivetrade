@@ -173,10 +173,18 @@
   flex-shrink: 0;
 }
 .academy-list-index {
+  display: inline-grid;
   width: 24px;
+  place-items: start;
   color: var(--color-faint);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+.academy-list-row.is-done .academy-list-index {
+  color: var(--color-ok);
+}
+.academy-list-row.is-done small {
+  color: var(--color-ok);
 }
 .academy-node {
   width: 10px;
@@ -836,4 +844,20 @@
   .academy-dialog[open] {
     animation: none;
   }
+}
+
+/* Advanced, optional exercises under the required twelve. */
+.academy-advanced-labs {
+  display: grid;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.academy-advanced-labs h3 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.academy-profit-track .academy-bridge {
+  margin-top: 12px;
 }

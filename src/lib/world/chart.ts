@@ -1,7 +1,11 @@
-export type CandleInterval = 60 | 300 | 900;
+export type CandleInterval = 15 | 60 | 300 | 900;
 export interface QuoteSample {
   t: number;
   price: number;
+  /** Optional window extremes recorded by the engine; samples without them count as one quote. */
+  open?: number;
+  high?: number;
+  low?: number;
 }
 export interface QuoteCandle {
   time: number;
@@ -106,7 +110,7 @@ export function aggregateQuoteCandles(
   interval: CandleInterval,
   { through, scale = 1 }: { through?: number; scale?: number } = {},
 ): QuoteCandle[] {
-  if (![60, 300, 900].includes(interval)) throw new RangeError("Unsupported candle interval");
+  if (![15, 60, 300, 900].includes(interval)) throw new RangeError("Unsupported candle interval");
   if (!Number.isFinite(scale) || scale < 0) throw new RangeError("Invalid quote scale");
   if (through !== undefined && !Number.isFinite(through))
     throw new RangeError("Invalid chart time");
@@ -119,7 +123,18 @@ export function aggregateQuoteCandles(
         (through === undefined || point.t <= through) &&
         Number.isFinite(point.price * scale),
     )
-    .map((point, index) => ({ t: point.t, price: point.price * scale, index }))
+    .map((point, index) => {
+      const extreme = (value: number | undefined) =>
+        value !== undefined && Number.isFinite(value) && value >= 0 ? value * scale : point.price * scale;
+      return {
+        t: point.t,
+        price: point.price * scale,
+        open: extreme(point.open),
+        high: Math.max(point.price * scale, extreme(point.high)),
+        low: Math.min(point.price * scale, extreme(point.low)),
+        index,
+      };
+    })
     .sort((a, b) => a.t - b.t || a.index - b.index);
   if (!samples.length) return [];
   const first = Math.floor(samples[0].t / interval) * interval;
@@ -141,11 +156,12 @@ export function aggregateQuoteCandles(
   for (const point of samples) {
     const candle = candles[Math.floor((point.t - first) / interval)];
     if (candle.samples === 0) {
-      candle.open = candle.high = candle.low = point.price;
+      candle.open = point.open;
+      candle.high = candle.low = point.price;
       candle.firstAt = point.t;
     }
-    candle.high = Math.max(candle.high!, point.price);
-    candle.low = Math.min(candle.low!, point.price);
+    candle.high = Math.max(candle.high!, point.high, candle.open!);
+    candle.low = Math.min(candle.low!, point.low, candle.open!);
     candle.close = point.price;
     candle.lastAt = point.t;
     candle.samples++;
@@ -176,4 +192,37 @@ export function chartTimeTicks(start: number, end: number, maxTicks = 5): number
   for (let tick = Math.ceil(start / step) * step; tick <= end; tick += step)
     ticks.push(Object.is(tick, -0) ? 0 : tick);
   return ticks;
+}
+
+export interface VolumeBar {
+  time: number;
+  volume: number;
+}
+
+/** Engine samples carry running total volume; bars hold the traded amount within each interval. */
+export function intervalVolumes(
+  input: readonly { t: number; volume?: number }[],
+  interval: number,
+  { through }: { through?: number } = {},
+): VolumeBar[] {
+  if (!Number.isFinite(interval) || interval <= 0) throw new RangeError("Invalid interval");
+  const samples = input
+    .filter(
+      (point) =>
+        Number.isFinite(point.t) &&
+        typeof point.volume === "number" &&
+        Number.isFinite(point.volume) &&
+        (through === undefined || point.t <= through),
+    )
+    .sort((a, b) => a.t - b.t);
+  const bars = new Map<number, number>();
+  let previous: number | null = null;
+  for (const point of samples) {
+    const time = Math.floor(point.t / interval) * interval;
+    // The first retained sample has no predecessor, and a lower total means history was trimmed.
+    const delta = previous === null ? 0 : Math.max(0, point.volume! - previous);
+    previous = point.volume!;
+    bars.set(time, (bars.get(time) ?? 0) + delta);
+  }
+  return [...bars].map(([time, volume]) => ({ time, volume }));
 }

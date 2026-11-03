@@ -1,0 +1,192 @@
+.psim {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 18px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 20px;
+  background: var(--color-surface);
+}
+
+.psim h3 {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.psim-lead,
+.psim-note {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.psim-note {
+  color: var(--color-faint);
+  font-size: 11px;
+}
+
+.psim-field {
+  display: grid;
+  gap: 6px;
+}
+
+.psim-field > span {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.psim-segment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.psim-segment button {
+  min-height: 34px;
+  min-width: 48px;
+  padding: 0 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-fg);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.psim-segment button:hover {
+  border-color: var(--color-muted);
+}
+
+.psim-segment button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 20%, transparent);
+}
+
+.psim-chart {
+  padding: 10px 10px 6px;
+  border-radius: 14px;
+  background: var(--color-bg);
+}
+
+.psim-chart svg {
+  display: block;
+  width: 100%;
+  height: 150px;
+  overflow: visible;
+}
+
+.psim-base {
+  stroke: var(--color-line);
+  stroke-dasharray: 3 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.psim-path {
+  fill: none;
+  stroke: var(--color-muted);
+  stroke-opacity: 0.28;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.psim-median {
+  fill: none;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.psim-median.is-up {
+  stroke: var(--color-ok);
+}
+
+.psim-median.is-down {
+  stroke: var(--color-bad);
+}
+
+.psim-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--color-faint);
+  font-size: 10px;
+}
+
+.psim-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--color-line);
+}
+
+.psim-stats div {
+  padding: 10px 12px;
+  background: var(--color-surface);
+}
+
+.psim-stats dt {
+  color: var(--color-faint);
+  font-size: 11px;
+}
+
+.psim-stats dd {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.psim .is-up {
+  color: var(--color-ok);
+}
+
+.psim .is-down {
+  color: var(--color-bad);
+}
+
+.psim-verdict {
+  padding: 10px 12px;
+  border-left: 3px solid var(--color-ok);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--color-ok) 10%, transparent);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.psim-verdict.is-warn {
+  border-left-color: var(--color-bad);
+  background: color-mix(in oklab, var(--color-bad) 10%, transparent);
+}
+
+.psim-reroll {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.psim-reroll:hover {
+  color: var(--color-fg);
+}
+
+@media (min-width: 640px) {
+  .psim-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

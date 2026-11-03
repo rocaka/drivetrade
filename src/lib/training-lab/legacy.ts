@@ -322,8 +322,7 @@ function npcSell(s: LabState, t: LabToken, ratio: number) {
 }
 function advanceOne(s: LabState) {
   s.step++;
-  const i = indexOf(s),
-    a = s.tokens[0];
+  const i = indexOf(s);
   for (const t of s.tokens) {
     const wave = (numberSeed(s.seed + t.id + s.step) % 100) / 100;
     if ((i === 3 && s.step === 2) || (i === 10 && s.step === 2)) {
