@@ -1,0 +1,216 @@
+.training-pane {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+}
+.training-pane[hidden] {
+  display: none;
+}
+.training-header {
+  flex: 0 0 auto;
+  color: var(--color-primary-fg);
+}
+.training-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: max(env(safe-area-inset-top, 0px), 8px) 12px 0;
+}
+.training-nav button {
+  min-height: 44px;
+  padding: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in oklab, var(--color-primary-fg) 75%, transparent);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background 300ms ease-out,
+    color 300ms ease-out,
+    transform 300ms ease-out;
+}
+.training-nav button[aria-current="page"] {
+  background: var(--color-primary-fg);
+  color: var(--color-primary);
+}
+.training-nav button:active {
+  transform: scale(0.98);
+}
+.training-header-copy {
+  max-width: 32rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: 18px 20px 22px;
+}
+.training-header-kicker {
+  font-size: 13px;
+  line-height: 1.5;
+  color: color-mix(in oklab, var(--color-primary-fg) 80%, transparent);
+  margin: 0 0 8px;
+}
+.training-header-title {
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  margin: 0;
+  text-wrap: balance;
+}
+.training-text-reveal {
+  overflow: visible;
+  text-wrap: balance;
+}
+.training-text-line {
+  display: block;
+  padding-bottom: 0.09em;
+  margin-bottom: -0.09em;
+}
+.training-text-line > span {
+  animation-duration: 720ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
+}
+.training-animated-value {
+  font-variant-numeric: tabular-nums;
+}
+.training-disclosure {
+  margin: 16px 0;
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+}
+.training-disclosure + .training-disclosure {
+  margin-top: -17px;
+}
+.training-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 60px;
+  padding: 16px 0;
+  cursor: pointer;
+  list-style: none;
+  color: var(--color-fg);
+  font-size: 14px;
+}
+.training-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.training-disclosure > summary strong {
+  font-weight: 500;
+}
+.training-disclosure > summary small {
+  display: block;
+  margin-top: 5px;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.training-disclosure > summary > svg {
+  flex-shrink: 0;
+  color: var(--color-muted);
+  transition: transform 220ms ease-out;
+}
+.training-disclosure[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.training-disclosure-content {
+  padding: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--color-muted);
+  animation: screen-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.training-disclosure-content p {
+  margin: 0 0 12px;
+  text-wrap: pretty;
+}
+.training-disclosure-content p:last-child {
+  margin-bottom: 0;
+}
+.training-disclosure-content strong {
+  color: var(--color-fg);
+}
+.training-flow-state {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--color-fg);
+  background: var(--color-bg);
+}
+.training-flow-state > div {
+  width: 100%;
+  max-width: 28rem;
+}
+.training-flow-state h1 {
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.2;
+  margin-bottom: 12px;
+}
+.training-flow-state p {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--color-muted);
+  margin: 12px 0 24px;
+}
+.training-flow-state button + button {
+  margin-top: 12px;
+}
+.training-flow-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, var(--color-bg) 82%, transparent);
+  padding: 20px;
+}
+.training-flow-modal > section {
+  max-width: 28rem;
+  width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-2xl);
+  padding: 24px;
+  background: var(--color-surface);
+  animation: screen-in 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.training-flow-modal h2 {
+  font-size: 26px;
+  line-height: 1.25;
+  font-weight: 900;
+}
+.training-flow-modal p {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--color-muted);
+  margin: 16px 0 24px;
+}
+.training-flow-actions {
+  display: grid;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .training-header-title {
+    font-size: 32px;
+  }
+  .training-header-copy {
+    padding-top: 16px;
+    padding-bottom: 20px;
+  }
+  .training-flow-modal {
+    align-items: flex-end;
+    padding: 16px;
+  }
+}

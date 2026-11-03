@@ -1,0 +1,34 @@
+node_modules/
+work/
+.output/
+.vercel/output/
+.tanstack/tmp/
+.grok/*.log
+.grok/*.pid
+screenshots/*-new.*
+
+# Local runtime, generated output and QA data
+.DS_Store
+.node_modules.lock
+.grok/status
+.project_id
+.tanstack/
+.vercel/
+screenshots/
+artifacts/
+attachments/
+*.log
+*.pid
+*.tsbuildinfo
+
+# Server-only configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+.npmrc
+.netrc
+*.pem
+*.key
+*.p12
+*.pfx
