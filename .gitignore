@@ -35,3 +35,4 @@ attachments/
 
 # Local Claude Code preview settings
 .claude/
+.vercel
